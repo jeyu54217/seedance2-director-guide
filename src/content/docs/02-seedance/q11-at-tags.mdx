@@ -1,5 +1,5 @@
 ---
-title: "@image1、@video1 這些標籤怎麼運作？"
+title: "@image1、@video1 這些標籤怎麼運作？——Embedding Slot 特徵注入"
 description: "@ 標籤不是文字替換，是 embedding slot——直接把視覺特徵灌進 Cross-Attention"
 sidebar:
   order: 3
@@ -21,7 +21,7 @@ sidebar:
                            ──→ @video1 的 K/V（運鏡軌跡特徵）
 ```
 
-這讓複合指令變得可行：`"@image1 的角色穿著 @image2 的衣服，按 @video1 的運鏡方式走動"`——三個參考來源同時查詢，Q10 的 Dynamic Weight Masking 負責隔離。
+這讓複合指令變得可行：`"@image1 的角色穿著 @image2 的衣服，按 @video1 的運鏡方式走動"`——三個參考來源同時查詢，Q9 的 Dynamic Weight Masking 負責隔離。
 
 :::tip[🎬 導演要點]
 - @ 標籤像導演直接給演員看照片，而非口頭描述長相——跳過文字轉譯，訊號更直接

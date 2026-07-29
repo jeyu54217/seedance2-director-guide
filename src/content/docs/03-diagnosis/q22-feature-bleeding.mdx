@@ -7,7 +7,7 @@ sidebar:
 
 ## 🔍 根因
 
-Dynamic Weight Masking（Q10）的遮罩 A=Softmax(QKᵀ/√dk+M) 依賴模型特徵解耦能力。角色視覺特徵太接近（同色系、同髮色）→ 解耦失敗。MindStudio 測試：Identity Slot 上限 ~2 角色。
+Dynamic Weight Masking（Q9）的遮罩 A=Softmax(QKᵀ/√dk+M) 依賴模型特徵解耦能力。角色視覺特徵太接近（同色系、同髮色）→ 解耦失敗。MindStudio 測試：Identity Slot 上限 ~2 角色。
 
 ## 🛠️ 解法
 

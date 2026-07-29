@@ -7,11 +7,11 @@ sidebar:
 
 ## 🔍 根因
 
-Q10 的 Reference Cross-Attention 隨序列長度衰減——到了第 500 步，Query 和 Identity Embedding 的累積偏差沒有機制拉回來。解析度/長寬比變動觸發 patch 網格重算，Attention 空間參考點全部移位（Reddit r/aivideos）。
+Q9 的 Reference Cross-Attention 隨序列長度衰減——到了第 500 步，Query 和 Identity Embedding 的累積偏差沒有機制拉回來。解析度/長寬比變動觸發 patch 網格重算，Attention 空間參考點全部移位（Reddit r/aivideos）。
 
 ## 🛠️ 解法
 
-- **ComfyUI**：IP-Adapter FaceID Plus V2，weight **0.8–0.9**。疊加 FaceDetailer，denoise **0.2–0.35**。同一張原始參考圖貫穿全場景——不要用前一場截圖（Q10）。鎖定解析度和長寬比
+- **ComfyUI**：IP-Adapter FaceID Plus V2，weight **0.8–0.9**。疊加 FaceDetailer，denoise **0.2–0.35**。同一張原始參考圖貫穿全場景——不要用前一場截圖（Q9）。鎖定解析度和長寬比
 - **Seedance**：`@image1` 純色背景正面特寫。Prompt 角色描述模板鎖定不變，只改動作和場景
 
 :::note[📖]
