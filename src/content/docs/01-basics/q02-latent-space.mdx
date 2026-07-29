@@ -11,6 +11,8 @@ Q1 說模型從雜訊中雕刻。但雕在哪？——不在像素上。模型�
 
 ![Stable Diffusion 架構圖：Pixel Space → VAE Encoder → Latent Space → Denoising → VAE Decoder → Pixel Space](latent-space.png)
 
+▲ 從右向左看下半部：Pixel Space ← VAE Decoder ← Latent Space（去噪）——這就是 reverse diffusion，模型一刀一刀鑿掉雜訊、讓畫面浮出來的路徑。
+
 ## 為什麼不能在像素上直接雕刻？
 
 兩個理由。
