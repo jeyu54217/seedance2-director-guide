@@ -73,6 +73,7 @@ details[open]>summary{border-radius:10px 10px 0 0;background:#fdfaf7}
 .answer h4{font-size:.92rem;font-weight:700;color:var(--accent);margin:1rem 0 .5rem;padding-bottom:.2rem;border-bottom:1px dotted var(--border);letter-spacing:.02em}
 .answer p{margin-bottom:.6rem}
 .answer strong{color:var(--accent)}
+.answer img{max-width:100%;height:auto}
 .answer ul,.answer ol{margin:.4rem 0 .8rem 0;padding-left:0;list-style:none}
 .answer li{margin-bottom:.5rem;padding-left:1.3rem;position:relative;line-height:1.65}
 .answer li::before{content:'\\2022';position:absolute;left:.25rem;color:var(--accent);font-weight:700;font-size:1.1em}
