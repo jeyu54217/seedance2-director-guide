@@ -1,19 +1,53 @@
 ---
-title: 多角色特徵污染（Feature Bleeding）
-description: Dynamic Weight Masking 依賴模型特徵解耦能力——角色視覺特徵太接近導致解耦失敗
+title: 兩個角色的臉混在一起（Feature Bleeding）——多角色特徵污染
+description: Cross-Attention 的 Key/Value 隔離失敗——角色視覺特徵太接近導致 Dynamic Weight Masking 解耦失敗
 sidebar:
-  order: 4
+  order: 8
 ---
 
-## 🔍 根因
+## 一句話
 
-Dynamic Weight Masking（Q9）的遮罩 A=Softmax(QKᵀ/√dk+M) 依賴模型特徵解耦能力。角色視覺特徵太接近（同色系、同髮色）→ 解耦失敗。MindStudio 測試：Identity Slot 上限 ~2 角色。
+兩個角色的視覺特徵太接近（同色系、同髮色）→ [Q4：注意力機制](../01-basics/q04-attention/) 的 Cross-Attention Key/Value 路由混淆 → [Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 Dynamic Weight Masking 解耦失敗 → 紅衣角色的紅色滲透到白衣角色身上。
 
-## 🛠️ 解法
+## WHY：Cross-Attention 的隔離機制怎麼失效的？
 
-- **ComfyUI**：Regional Prompting + SAM 預分割，每個 IP-Adapter 只綁定對應 mask 區域
-- **Seedance**：角色色系差異最大化（紅 vs 藍 >> 紅 vs 橘）。純色背景特寫。**≤2 角色**
+[Q4：注意力機制](../01-basics/q04-attention/) 在解釋 Feature Bleeding 時已經給出原始機制：`@image1`（紅衣）和 `@image2`（白衣）同時存在，Cross-Attention 沒正確隔離兩組 Key/Value → 紅色滲透到白色區。
 
-:::note[📖]
-[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) · [IP-Adapter §4](https://arxiv.org/abs/2308.06721)
+[Q11：@ 標籤](../02-seedance/q11-at-tags/) 進一步展開底層機制：當 Prompt 出現 `@image1` 和 `@image2`，模型在 Cross-Attention 中分配兩個 embedding slot，生成畫面的 Query 分別路由到對應的 Key/Value 矩陣。**Dynamic Weight Masking**（M = Softmax(QKᵀ/√dk + M)）負責隔離——遮罩 M 告訴 Query：「你只能看這個 slot 的 K/V，不能看另一個。」
+
+但這個遮罩的有效性**完全依賴模型對兩個角色視覺特徵的解耦能力**。如果兩個角色的色系太接近（紅色 vs 橘色），Cross-Attention 的 Query 在 latent space 中分不清哪個 K/V 屬於哪個角色——遮罩形同虛設。
+
+## WHAT：甜蜜點與上限
+
+[Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) 的素材上限分析：兩個角色是甜蜜點，三個以上 Identity 開始漂移。這不是硬體限制——是 Cross-Attention 的注意力資源有限。每個新增的角色分走一部分 Attention 權重，隔離精度等比下降。
+
+## HOW
+
+### ComfyUI
+
+- **Regional Prompting + SAM 預分割**：先用 SAM 做語意分割，把畫面切成獨立區域，每個 IP-Adapter 只綁定對應 mask 區域（引用 [Q4](../01-basics/q04-attention/) ControlNet 的獨立路徑概念——不走 Cross-Attention 全域查閱，而是 spatial localized injection）
+- 每個角色獨立 IP-Adapter，weight 獨立調整
+
+### Seedance 2.0
+
+- **角色色系差異最大化**：紅 vs 藍 >> 紅 vs 橘（[Q9](../02-seedance/q09-multimodal-fusion/) 實證：色系差異越大，Cross-Attention K/V 隔離越乾淨）
+- 純色背景特寫（[Q11](../02-seedance/q11-at-tags/) 警告：背景凌亂 = Identity Embedding 混進雜訊）
+- **≤2 角色**：超過兩個，隔離精度不可靠
+
+:::tip[🎬 導演要點]
+
+多角色場景的鐵律：**色系差異最大化、純色背景、≤2 角色。**
+
+Feature Bleeding 不是 prompt 寫得不夠清楚——是 Cross-Attention 在 latent space 中真的分不出來。給模型視覺上容易區分的輸入，比寫更多 prompt 有用。
+
+:::
+
+:::note[📖 引用論文]
+[DiT (Peebles & Xie, ICCV 2023, §3.1)](https://arxiv.org/abs/2212.09748) — Cross-Attention 條件化機制。
+
+[IP-Adapter (Ye et al., 2023, §3.2, §4)](https://arxiv.org/abs/2308.06721) — 解耦 Cross-Attention。
+
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 多模態參考與 Dynamic Weight Masking。
+
+[Controllable Video Survey (Ma et al., §4.2)](https://arxiv.org/abs/2507.16869) — 控制信號注入 DiT。
 :::

@@ -1,15 +1,68 @@
 ---
-title: 畫面閃爍／過飽和
-description: FreeInit 修閃爍，RescaleCFG 修過飽和——具體參數對照
+title: 畫面一直閃、顏色太豔（Flicker & Oversaturation）——閃爍與過飽和
+description: Temporal Attention 曝光不一致導致閃爍，CFG 外推過頭導致過飽和——兩種最常見的視覺品質問題
 sidebar:
-  order: 8
+  order: 2
 ---
 
-| 問題 | 解法 |
-|---|---|
-| 畫面閃爍 | FreeInit（預設參數）；Euler sampler；Steps ≥ 25 |
-| 過飽和 | RescaleCFG 0.5–0.7（Q5）；降低 Prompt 情緒強度詞；Dynamic Thresholding |
+## 一句話
 
-:::note[📖]
-[RescaleCFG (WACV 2024, §3–4)](https://arxiv.org/abs/2305.08891)
+閃爍是 Temporal Attention 在幀與幀之間曝光沒對齊；過飽和是 CFG 外推過頭把色彩也推爆了——兩種問題、兩種根因、兩種解法。
+
+## 畫面閃爍
+
+### WHY
+
+[Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 負責相鄰幀之間的 token 匹配——第 1 幀的天空 token 要和第 2 幀的天空 token 對齊，確保亮度、顏色、紋理一致。但 [Q6：時間步調節](../01-basics/q06-timestep/) 揭示了關鍵限制：去噪後段（t→0）每幀的殘餘雜訊是**獨立取樣**的——這些微小的 per-frame 偏差在 Temporal Attention 無法完全平滑時，累積為肉眼可見的亮度跳動。
+
+WaveSpeed 的社群診斷將閃爍細分為四種子類型，每種對應不同的 Attention 失效模式：
+
+| 類型 | 表現 | Attention 失效點 |
+|---|---|---|
+| Flicker | 逐幀亮度/顏色跳動，低對比度區域最明顯 | Temporal Attention 曝光權重不一致 |
+| Jitter | 邊緣微小位置偏移，像在顫抖 | Self-Attention 空間定位漂移 |
+| Warp | 幾何彎曲或斷裂（手拉伸、杯子模糊） | Cross-Attention 參考點位移 |
+| Texture Crawl | 高頻紋理（織物、磚塊）在靜態鏡頭中游動 | VAE latent 高頻細節還原不穩定 |
+
+### HOW
+
+- **FreeInit**（預設參數）：重設初期雜訊，強化 Temporal Attention 在整個序列上的一致性約束
+- **Euler sampler**：[Q7：Flow Matching](../01-basics/q07-flow-matching/) 的連續時間路徑比離散 DDPM 更平滑——減少每步之間的跳躍誤差
+- **Steps ≥ 25**：Flow Matching 的數學保證（Q7），足夠的去噪步數讓 Temporal Attention 有充分機會修正幀間偏差
+- Prompt 鎖定光照：「soft shadows, no flicker, constant exposure, consistent key light」
+- 參考素材清理：壓縮雜訊的參考圖會把 JPEG 區塊偽影 bake-in 到 Temporal Attention 的匹配模式中——先對參考圖做 mild denoise
+
+## 過飽和
+
+### WHY
+
+[Q5：CFG 與信噪比崩潰](../01-basics/q05-cfg/) 的機制直接解釋過飽和：CFG 在有 Prompt 和無 Prompt 兩次預測之間做**線性外推**。外推過頭時，SNR 崩潰不只砍掉雜訊——在色彩域，這個崩潰表現為**飽和度失控**。模型把「正常色彩」和「Prompt 要求的情緒強度」一起外推，結果顏色爆掉。
+
+### HOW
+
+- **RescaleCFG 0.5–0.7**：[Q5](../01-basics/q05-cfg/) 的安全閥——去噪後段自動降 CFG，防止色彩域 SNR 崩潰
+- 降低 Prompt 情緒強度詞：「溫暖的陽光」而不是「極度熾熱刺眼的金色光芒」
+- **Dynamic Thresholding**：ComfyUI 中的額外防線，限制每步去噪的極端值
+- Seedance 2.0 內建類似 RescaleCFG 機制（Q5 導演要點提到）——但不同平台的實作參數不同，過飽和問題在第三方平台比官方 Dreamina 更常見
+
+:::tip[🎬 導演要點]
+
+閃爍和過飽和常常一起出現——因為兩者都來自去噪後段的失控。
+
+**先修閃爍，再調色彩。** FreeInit + Euler + Steps ≥ 25 解決閃爍。RescaleCFG 0.5–0.7 解決過飽和。
+
+慢速運鏡 > 快速運鏡——[Q28：背景漂移](q23-background-drift/) 和 [Q27：快速運動崩潰](q27-fast-motion/) 也都是同一個 Temporal Attention 窗口限制的受害者。
+
+:::
+
+:::note[📖 引用論文]
+[CFG (Ho & Salimans, 2022, §3)](https://arxiv.org/abs/2207.12598) — CFG 線性外推機制。
+
+[RescaleCFG (Lin et al., WACV 2024, §3–4)](https://arxiv.org/abs/2305.08891) — 去噪後段自動降 CFG。
+
+[Flow Matching (Lipman et al., ICLR 2023, §2–3)](https://arxiv.org/abs/2210.02747) — 連續時間路徑與 Steps。
+
+[Survey of Video Diffusion Models (TMLR 2025, §3.3)](https://arxiv.org/abs/2504.16081) — Temporal Attention 機制。
+
+[DiT (Peebles & Xie, ICCV 2023, §3.2)](https://arxiv.org/abs/2212.09748) — AdaLN-Zero 與 timestep conditioning。
 :::

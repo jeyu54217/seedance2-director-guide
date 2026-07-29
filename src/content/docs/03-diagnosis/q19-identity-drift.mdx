@@ -1,19 +1,61 @@
 ---
-title: 角色跨鏡頭變臉（Identity Drift）
-description: Reference Cross-Attention 隨序列長度衰減——解析度/長寬比變動觸發 patch 網格重算，Attention 參考點移位
+title: 同一角色換鏡頭就變臉（Identity Drift）——跨鏡頭身份漂移 + 延伸劣化
+description: Cross-Attention 的 Identity Embedding 隨序列長度衰減——解析度/長寬比變動觸發 patch 網格重算，Attention 參考點移位
 sidebar:
-  order: 1
+  order: 3
 ---
 
-## 🔍 根因
+## 一句話
 
-Q9 的 Reference Cross-Attention 隨序列長度衰減——到了第 500 步，Query 和 Identity Embedding 的累積偏差沒有機制拉回來。解析度/長寬比變動觸發 patch 網格重算，Attention 空間參考點全部移位（Reddit r/aivideos）。
+同一個角色，換個鏡頭就變了一張臉——[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 Identity Embedding 在長序列中去噪後段權重衰減，加上 [Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼在解析度變動時重算 patch 網格，Attention 參考點全部移位。
 
-## 🛠️ 解法
+## WHY：為什麼換鏡頭就變臉？
 
-- **ComfyUI**：IP-Adapter FaceID Plus V2，weight **0.8–0.9**。疊加 FaceDetailer，denoise **0.2–0.35**。同一張原始參考圖貫穿全場景——不要用前一場截圖（Q9）。鎖定解析度和長寬比
-- **Seedance**：`@image1` 純色背景正面特寫。Prompt 角色描述模板鎖定不變，只改動作和場景
+[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的機制是把參考圖的視覺特徵當作 embedding slot 直接灌進 Cross-Attention。`@image1` 的面部 Key/Value 在每一步去噪都被 Query 查閱——這是 Seedance 2.0 維持角色一致性的核心。
 
-:::note[📖]
-[IP-Adapter §4](https://arxiv.org/abs/2308.06721) · [PuLID §3–4](https://arxiv.org/abs/2404.16022) · [Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148)
+但 [Q4：注意力機制](../01-basics/q04-attention/) 揭示了關鍵限制：Cross-Attention 的 Query-Key 匹配不是靜態的。隨著去噪進行，[Q6：時間步調節](../01-basics/q06-timestep/) 的 AdaLN-Zero 在 t→0（去噪後段）改變了每個 Transformer Block 的行為模式——後段專注紋理細節，對 Identity Embedding 的參考權重**自然衰減**。這是設計特性，不是 bug：後段本來就該補細節，不該繼續查參考圖。
+
+但問題出在：如果序列夠長、鏡頭切換夠多次，這個衰減會累積到角色臉部特徵開始漂移。
+
+## WHAT：兩個觸發條件
+
+**條件一：解析度或長寬比變動。** [Q6](../01-basics/q06-timestep/) 的位置編碼依賴固定的 patch 網格——長寬比一換，網格重算，所有 token 的空間座標重新分配。Cross-Attention 在上一個鏡頭建立的 Key/Value 參考點，在新網格中對應不到原來的空間位置。
+
+**條件二：Extension 鏈累積劣化。** [Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) Self-Attention 瓶頸意味著長序列不只是「更多幀」——是 token 數量平方成長的運算壓力。實際部署時 Temporal Attention 窗口被截斷以控制計算量，extension 6 次以上的 contextual memory 嚴重衰減。[Q16：Storyboard](../02-seedance/q16-storyboard/) 的 Shot Decomposition 機制也證實：每個 shot 是獨立生成的，不是真正連續——extension 是「生成下一個 shot 並試圖匹配上一個」，而非「繼續生成同一個序列」。
+
+## HOW
+
+### ComfyUI
+
+- **IP-Adapter FaceID Plus V2**，weight **0.8–0.9**：在每步去噪中強制注入面部 identity embedding（引用 [Q4](../01-basics/q04-attention/) 的 IP-Adapter 解耦 Cross-Attention 機制）
+- 疊加 **FaceDetailer**，denoise **0.2–0.35**：後段局部修復面部區域
+- **同一張原始參考圖貫穿全場景**——不要用前一場截圖當下一場參考（[Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) 的警告：累積光源和色調偏差）
+- 鎖定解析度和長寬比——避免觸發 patch 網格重算（Q6 位置編碼）
+
+### Seedance 2.0
+
+- `@image1` 用純色背景的正面特寫（[Q9](../02-seedance/q09-multimodal-fusion/) 最佳實踐：背景雜亂會被當成 identity 特徵一起編碼）
+- Prompt 中的角色描述模板**鎖定不變**，只改動作和場景
+- Extension 每次不超過 6 段，每段重新上傳原始參考圖重設 identity anchor
+
+:::tip[🎬 導演要點]
+
+Identity Drift 不是「模型忘記了角色長怎樣」——是 Attention 參考點在長序列和解析度變動中移位了。
+
+**鎖定三件事：參考圖（同一張）、解析度（不要換）、Prompt 角色描述（模板鎖死）。**
+
+Extension 本質上是獨立 shot 生成，不是連續拍攝——每段 extension 都是新的起點，需要重新錨定。
+
+:::
+
+:::note[📖 引用論文]
+[DiT (Peebles & Xie, ICCV 2023, §3.1–3.2)](https://arxiv.org/abs/2212.09748) — Cross-Attention 與 AdaLN-Zero。
+
+[IP-Adapter (Ye et al., 2023, §3.2, §4)](https://arxiv.org/abs/2308.06721) — 解耦 Cross-Attention 注入 identity。
+
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 多模態參考與序列限制。
+
+[Attention Surgery (arXiv:2509.24899, §1)](https://arxiv.org/abs/2509.24899) — O(n²) Self-Attention 運算佔比。
+
+[Survey of Video Diffusion Models (TMLR 2025, §3.3)](https://arxiv.org/abs/2504.16081) — Temporal Attention 與位置編碼。
 :::

@@ -1,0 +1,50 @@
+---
+title: 動作一快，人跟東西就消失（Fast Motion Warping）——快速運動的畫面崩潰
+description: Temporal Attention 在高運動幅度時 token 匹配失效——O(n²) 窗口截斷 + 位置編碼大位移失效
+sidebar:
+  order: 9
+---
+
+## 一句話
+
+動作太快時，物體消失、邊緣模糊、畫面崩潰——[Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 跨幀 token 匹配在高速運動時失敗，[Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) 窗口截斷讓高速場景首當其衝。
+
+## WHY：Temporal Attention 的 token tracker 跟丟了
+
+[Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 負責在相鄰幀之間匹配 token——第 1 幀「奔跑中的人的左手」要和第 2 幀「同一個人的左手」對齊。匹配的數學基礎是 [Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼：兩個 token 的空間位置 + 時間位置的餘弦相似度。
+
+**高速運動時，同一個物體在相鄰幀之間的位移過大**——位置編碼的餘弦相似度驟降到匹配閾值以下。Temporal Attention 判定「這兩個 token 不是同一個東西」→ token tracker 跟丟 → 物體從這一幀開始「消失」或「變形」。
+
+這跟 [Q22：肢體融化](q20-limb-melting/)（SNR 崩潰把肢體當雜訊砍）和 [Q25：物理失敗](q24-physics-failure/)（Physics Reward 的表面模擬）不同——這是 **token 追蹤層面的失敗**。消失的物體不是「物理上不合理地漂浮」，而是「模型的 attention tracker 直接失去了對這個物體的追蹤」。
+
+## WHAT：O(n²) 截斷讓高速場景更脆弱
+
+[Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) 瓶頸（Self-Attention 佔 76% 運算）導致實際部署時 Temporal Attention 的匹配窗口被截斷為有限幀數。高速場景中物體在更少幀內位移更大——窗口內可用的匹配幀更少、位移更大 = 匹配成功率急劇下降。
+
+[Q14：運鏡機制](../02-seedance/q14-camera-motion/) 的預訓練視覺先驗從反面印證：訓練數據中「slow camera movement」遠多於「fast whip pan」。模型根本沒有足夠的訓練樣本學會在高速場景下維持 temporal consistency。
+
+## HOW
+
+- **降低運動速度**：morphic.com 指南的結論 "walks slowly > sprints"——慢速連續運動是 Temporal Attention 的甜蜜點
+- **慢速 dolly-in 代替快速 zoom**：同樣是靠近主體，dolly-in（物理移動攝影機）在幀間位移分佈均勻，zoom（改變焦距）造成邊緣區域的非線性位移
+- 避免快速變焦和快速 whip pan——這些運鏡在訓練數據中本來就稀少
+- 在 prompt 中指定「slow, continuous movement, consistent speed」——不要只描述動作內容，也要描述動作速度
+- [Q28：背景漂移](q23-background-drift/) 的解法也適用：CameraCtrl + FreeInit + Tile ControlNet 三連提供 explicit 空間約束
+
+:::tip[🎬 導演要點]
+
+快速運動 = Temporal Attention 的極限測試。模型在慢速場景中表現好不是巧合——是訓練數據分佈和 O(n²) 窗口截斷的雙重結果。
+
+**慢速、連續、均勻的動作 > 快速、複雜、變速的動作。** 如果需要快速動作：拆成多段短鏡頭，每段控制速度和幅度。
+
+:::
+
+:::note[📖 引用論文]
+[Survey of Video Diffusion Models (TMLR 2025, §3.3)](https://arxiv.org/abs/2504.16081) — Temporal Attention 機制。
+
+[Attention Surgery (arXiv:2509.24899, §1)](https://arxiv.org/abs/2509.24899) — O(n²) Self-Attention 運算佔比與窗口限制。
+
+[DiT (Peebles & Xie, ICCV 2023, §3.2)](https://arxiv.org/abs/2212.09748) — 位置編碼與 token 匹配。
+
+[Seedance 1.5 Pro §3–4](https://arxiv.org/abs/2512.13507) — 預訓練視覺先驗分佈。
+:::

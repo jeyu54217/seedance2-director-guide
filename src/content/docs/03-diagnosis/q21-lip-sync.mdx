@@ -1,21 +1,67 @@
 ---
-title: 口型對不上語音
-description: Seedance 以 Prompt 對白文字為唇形 source of truth，上傳音訊僅作語音風格參考
+title: 口型對不上、發音怪怪的（Lip Sync Mismatch）——唇形同步與音訊品質
+description: Seedance 以 Prompt 對白文字為唇形 source of truth，上傳音訊僅作語音風格參考——非英語發音被英語化、長文字語速失控
 sidebar:
-  order: 3
+  order: 5
 ---
 
-## 🔍 根因
+## 一句話
 
-Q10 的雙分支架構特性：**Seedance 以 Prompt 對白文字為唇形 source of truth，上傳音訊僅作語音風格參考**（Reddit r/generativeAI）。crepal.ai 實測：乾淨錄音唇形延遲 40–80ms，嘈雜錄音 120–200ms。
+[Q10：雙分支架構](../02-seedance/q10-dual-branch/) 的 Audio Branch 以 Prompt 中的對白文字為唇形 ground truth——上傳的音訊只是語音風格的參考，不是同步來源。加上 TTS 層的通用音素模型對非英語扁平化處理，口型延遲和發音錯誤是架構特性而非 bug。
 
-## 🛠️ 解法
+## 唇形同步延遲
 
-- 對白 ≤12 詞/10s，≤20 詞/15s（ugccopilot.ai）
-- 精確時間標籤 `[00:01-00:03]`；句子間加微停頓標記作重同步錨點
-- 先用 ElevenLabs/Hume 生成乾淨音檔再 @Audio1 上傳
-- 減少頭部運動 Prompt（seedance.tv）。ComfyUI 無法修復（Q10）
+### WHY
 
-:::note[📖]
-[Seedance 1.5 Pro §3](https://arxiv.org/abs/2512.13507) · [Seedance 2.0 Model Card §2](https://arxiv.org/abs/2604.14148) · [OmniTalker (NeurIPS 2025)](https://arxiv.org/abs/2504.02433) — joint speech+talking face 的學術參考
+[Q10：雙分支架構](../02-seedance/q10-dual-branch/) 的核心機制：Visual Branch 和 Audio Branch 共用同一個去噪排程，每一步透過 **Cross-Modal Joint Module** 交換狀態。Audio Branch 把 **phoneme timing**（哪個音素在什麼時間點發出）傳給 Visual Branch——/p/ 音（雙唇爆破）→ 對應幀的嘴唇區域 latent 調整：雙唇閉合、爆破張開。
+
+關鍵在於：這個 phoneme timing 是從 **Prompt 中的雙引號對白文字** 經 TTS 層生成的——**不是從上傳的音訊檔案提取的**。上傳的 @Audio1 是節奏和語調的參考（[Q10](../02-seedance/q10-dual-branch/) 明確指出：上傳音訊是 voice style reference，不是 voice cloning source）。
+
+這解釋了為什麼唇形延遲在嘈雜錄音中更嚴重（120–200ms vs 乾淨錄音 40–80ms）：TTS 層從 Prompt 文字推斷 phoneme timing 時，嘈雜的音訊參考會干擾 timing prediction——Audio Branch 試圖匹配 noisy reference 的節奏，反而偏移了文字本來的 phoneme 時序。crepal.ai 實測數據。
+
+### HOW
+
+- 對白 ≤12 詞 / 10 秒，≤20 詞 / 15 秒（ugccopilot.ai 最佳實踐）
+- 精確時間標籤 `[00:01-00:03]` 提供 explicit timing anchor
+- 句子間加微停頓標記作重同步錨點：每個新句子讓 Cross-Modal Joint Module 重新對齊 phoneme timing
+- 減少頭部運動 Prompt——大幅度的頭部轉動使嘴唇區域 latent 追蹤難度倍增
+- **ComfyUI 無法修復原生雙分支去噪**——這是訓練階段嵌入的機制，推理端只能走級聯（[Q10](../02-seedance/q10-dual-branch/) 導演要點）
+
+## 音訊品質問題
+
+### WHY：為什麼非英語發音怪怪的？
+
+[Q18：中英文 Prompt](../02-seedance/q18-zh-en-prompt/) 揭示了訓練數據的語言偏差——Seedance 2.0 以中文影片為主訓練。非英語語言的 phoneme 集合（法語鼻母音、阿拉伯語喉音、義大利語彈舌音）在訓練數據中覆蓋率低。
+
+[Q10](../02-seedance/q10-dual-branch/) 的 TTS 層使用通用音素模型（學術參考：OmniTalker 的 text encoder → duration predictor → mel-spectrogram diffusion → vocoder 流程）——這個模型對所有語言套用同一套 phoneme mapping。非英語的特殊音素被**扁平化為最接近的英語/中文音素**。結果：法語的 "u" 變成英文的 "oo"，阿拉伯語的 "ع" 被完全跳過。
+
+### WHY：音樂節奏為什麼被改變、單詞為什麼重複？
+
+[Q10](../02-seedance/q10-dual-branch/) 的 Audio Branch 在去噪後段同樣面臨 [Q5：CFG](../01-basics/q05-cfg/) 描述的 SNR 衰減問題——長序列中 Audio Branch 的 denoising 後段對節奏和韻律的控制力下降，類似 Visual Branch 在後段的肢體融化（[Q22：肢體融化](q20-limb-melting/)）。節奏 drift 和單詞重複是 Audio Branch 版本的「多手多腳」。
+
+### HOW
+
+- 先用 ElevenLabs / Hume 生成乾淨音檔，再 @Audio1 上傳——讓 TTS 層有高品質的節奏參考
+- 非英語對白：phonetic spelling（用近似發音拼寫難詞），簡化句子、拆分長句
+- 一種語言一個場景——混合語言會降低發音精度（morphic.com 指南確認）
+- 語速自然的短句 > 長篇朗讀——長文字觸發 TTS 層的語速補償，越念越快
+
+:::tip[🎬 導演要點]
+
+Seedance 2.0 的唇形同步是 **text-driven**，不是 audio-driven。Prompt 對白寫得精準 > 上傳完美的音檔。
+
+對白寫短、加時間標籤、句子間加停頓——這三個動作比任何後製修復都有效。
+
+非英語場景：先在外面用專業 TTS 生成乾淨音檔，再丟給 Seedance。不要期待它的 TTS 層能完美處理非法語/阿拉伯語/義大利語。
+
+:::
+
+:::note[📖 引用論文]
+[Seedance 1.5 Pro §3–4](https://arxiv.org/abs/2512.13507) — 雙分支 DiT、Cross-Modal Joint Module、phoneme 同步。
+
+[Seedance 2.0 Model Card §2](https://arxiv.org/abs/2604.14148) — 音畫同步評測與多軌輸出。
+
+[OmniTalker (NeurIPS 2025)](https://arxiv.org/abs/2504.02433) — dual-branch DiT text→speech+talking face 學術參考。
+
+[CFG (Ho & Salimans, 2022, §3)](https://arxiv.org/abs/2207.12598) — SNR 衰減機制（音訊域的類比應用）。
 :::

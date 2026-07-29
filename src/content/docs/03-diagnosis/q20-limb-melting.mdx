@@ -1,19 +1,64 @@
 ---
-title: 肢體融化、多手多腳
+title: 手不見了、多長一隻腳（Limb Melting）——肢體融化與多餘器官
 description: 高 CFG 導致 SNR 崩潰，去噪後段把肢體結構當雜訊砍了——缺乏幾何約束
 sidebar:
-  order: 2
+  order: 4
 ---
 
-## 🔍 根因
+## 一句話
 
-高 CFG → SNR 崩潰（Q5），去噪後段把肢體結構當雜訊砍了。缺乏幾何約束（Q1），去噪前段姿態框架沒建立好（Q6），後段在錯誤框架上補細節。
+高 CFG 把肢體也當成雜訊砍掉了——[Q5：CFG](../01-basics/q05-cfg/) 的 SNR 崩潰在去噪後段（[Q6：時間步調節](../01-basics/q06-timestep/) 的 t→0）把細微的肢體結構連同雜訊一起削掉，前段姿態框架沒建好，後段在錯誤的基礎上補細節。
 
-## 🛠️ 解法
+## WHY：高 CFG 怎麼把肢體砍掉的？
 
-- **ComfyUI**：DWPose Full Body + Depth Anything V2 雙 ControlNet，strength **0.5–0.6**，start=0.0, end=**0.7**。CFG ≤ **7**。RescaleCFG = **0.6**
-- **Seedance**：`@video1` 真人動作參考。避免極端肢體描述。**禁用否定句**——Seedance 2.0 無 negative prompt 欄位（seedanceai.cc）
+[Q5：CFG 與信噪比崩潰](../01-basics/q05-cfg/) 的機制：每一步去噪，模型跑兩次預測——一次有 Prompt、一次沒有。CFG 在兩者之間做線性外推。CFG 越高，輸出越偏離「自由發揮」，越靠近「嚴格遵從 Prompt」。
 
-:::note[📖]
-[ControlNet (ICCV 2023, §3.1–3.3)](https://arxiv.org/abs/2302.05543) · [RescaleCFG (WACV 2024, §3–4)](https://arxiv.org/abs/2305.08891)
+但 [Q5](../01-basics/q05-cfg/) 的 CFG 數值表明確警告：**CFG > 12 = 極度強制，肢體崩壞機率極高。** 外推過頭時，模型不只是去掉雜訊——它把任何「不確定是不是 Prompt 要求的」東西都當雜訊處理。手指的細微關節、四肢的遠端部分、快速運動中的模糊邊緣——這些在 latent space 中本來就訊號較弱的區域，在高 CFG 下首當其衝被砍掉。
+
+這就是 **SNR 崩潰**：Signal-to-Noise Ratio 崩潰 = 模型分不清訊號和雜訊，把雕像跟大理石一起鑿了。
+
+## WHAT：為什麼是「多手多腳」而不是「沒有手腳」？
+
+[Q1：擴散模型](../01-basics/q01-diffusion-model/) 的去噪分工解釋了這個看似矛盾的現象：
+
+- **去噪前段（t 大）**：AdaLN-Zero（[Q6](../01-basics/q06-timestep/)）大開大合，建立構圖框架和姿態大致位置——「這裡應該有一條手臂」
+- **去噪後段（t 小）**：AdaLN 小心翼翼，補紋理細節——「這條手臂的手指有幾根、關節怎麼彎」
+
+問題出在：前段框架沒建好（因為缺乏幾何約束——[Q1](../01-basics/q01-diffusion-model/) 的去噪只靠 Prompt 引導，沒有骨骼/深度先驗），後段在這個錯誤框架上補細節。框架說「這裡有手臂」，但位置錯了——後段照樣在那個位置生出完整的肢體。結果：多了一隻手、手指數量不對、關節往不可能的方向彎。
+
+## HOW
+
+### ComfyUI
+
+- **DWPose Full Body + Depth Anything V2 雙 ControlNet**：在去噪前段注入幾何約束（[Q4：注意力機制](../01-basics/q04-attention/) 明確指出 ControlNet 走獨立 encoder + residual injection，不走 Cross-Attention——這是直接對 latent 施加結構約束，不是文字引導）
+- strength **0.5–0.6**，start=0.0, end=**0.7**：前段（框架建立期）介入，後段（紋理期）放手讓模型補細節
+- **CFG ≤ 7**：嚴格遵守 [Q5](../01-basics/q05-cfg/) 的甜蜜點
+- **RescaleCFG = 0.6**：去噪後段自動降 CFG，防止 SNR 崩潰（Q5 安全閥）
+
+### Seedance 2.0
+
+- `@video1` 真人動作參考：透過 [Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 motion extraction 直接注入運動 pattern
+- 避免極端肢體描述（「翻滾、射擊、然後跳躍」→ 拆成單一動作）
+- **禁用否定句**：Seedance 2.0 無 negative prompt 欄位（[Q11](../02-seedance/q11-at-tags/) 的機制——模型把否定詞解析為內容關鍵詞。「不要多手多腳」→ 模型讀到「多手多腳」，反而更容易生出來）
+
+:::tip[🎬 導演要點]
+
+**CFG ≤ 7。RescaleCFG 0.5–0.7。** 這兩個數字是肢體完整的底線。
+
+去噪前段沒有幾何約束 = 模型在黑暗中摸索姿態框架。ControlNet 的 DWPose + Depth 雙重約束就是你的手電筒。
+
+快速動作場景的肢體錯誤率約 40%——這不是 Seedance 的問題，是 video diffusion 的共通限制。解法不是拉高 CFG（只會更慘），是降低動作複雜度 + 加結構約束。
+
+:::
+
+:::note[📖 引用論文]
+[CFG (Ho & Salimans, 2022, §3)](https://arxiv.org/abs/2207.12598) — CFG 線性外推與 SNR 崩潰。
+
+[RescaleCFG (Lin et al., WACV 2024, §3–4)](https://arxiv.org/abs/2305.08891) — 去噪後段安全閥。
+
+[ControlNet (Zhang et al., ICCV 2023, §3.1)](https://arxiv.org/abs/2302.05543) — 獨立 encoder + residual injection。
+
+[DiT (Peebles & Xie, ICCV 2023, §3.2)](https://arxiv.org/abs/2212.09748) — AdaLN-Zero 前後段行為差異。
+
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 多模態動作參考。
 :::

@@ -1,0 +1,52 @@
+---
+title: 招牌、字幕、LOGO 全是亂碼（Text Rendering Failure）——文字渲染失敗
+description: Patchify 把筆畫切碎、VAE 感知壓縮把高頻細節丟掉——video diffusion 架構的根本限制
+sidebar:
+  order: 6
+---
+
+## 一句話
+
+影片中的任何文字（招牌、標誌、字幕、UI）幾乎必定輸出為亂碼——[Q3：Patchify](../01-basics/q03-patchify-dit/) 把筆畫結構切成碎片，[Q2：潛在空間](../01-basics/q02-latent-space/) 的 VAE 感知壓縮把文字邊緣的高頻細節丟掉。這是架構層面的根本限制，不是 Seedance 特有的 bug。
+
+## WHY：兩個架構瓶頸
+
+### 瓶頸一：Patchify 把筆畫切碎了
+
+[Q3：Patchify 與 DiT](../01-basics/q03-patchify-dit/) 的核心機制：64×64 語意網格被切成 2×2 的 token——每個 token 只看得到自己那 2×2 格裡的內容。中文字元的筆畫結構（特別是「繁」體字如「體」「龍」「邊」）遠超過 2×2 格的範圍——一個字被切碎成多個 token，每個 token 只看到筆畫的一小段。
+
+Self-Attention 可以在 token 之間建立關聯，但它學到的是「這個筆畫碎片和那個筆畫碎片在畫面中的空間關係」——不是「這兩筆屬於同一個中文字」。模型沒有 glyph-level 理解（不像 OCR 模型有字元級表徵），Self-Attention 重組的是視覺特徵，不是筆畫結構。
+
+### 瓶頸二：VAE 感知壓縮把高頻細節丟了
+
+[Q2：潛在空間](../01-basics/q02-latent-space/) 的感知壓縮（f=8）把「肉眼不可察的高頻細節抽象掉」——這對自然場景是好事（去掉不必要的表面雜訊），但對文字是災難。文字的邊緣銳利度、筆畫粗細變化、襯線細節——全部落在 VAE 認定為「高頻、可拋棄」的頻率範圍。壓縮後，文字區域在 latent space 中變成模糊的色塊，Decoder 還原時只能「猜」出類似文字的形狀——結果就是亂碼。
+
+## WHAT：不是 Seedance 的 bug，是 DiT 的限制
+
+所有基於 DiT 的 video model（Sora 2、Kling 3.0、Veo 3.1）都有相同的問題——[Q3](../01-basics/q03-patchify-dit/) 揭示的 DiT 本質：patch-based tokenization + VAE latent compression = 缺乏 glyph-level 表徵。這不是 bug，是目前架構設計取捨的必然結果。
+
+[Q17：Storyboard 實戰](../02-seedance/q17-storyboard-practice/) 的「文字滲入 bug」（storyboard 上的文字標註跑到輸出畫面）是同一個問題的反面——模型無法區分「應該渲染的文字」和「應該忽略的標註」。
+
+## HOW
+
+- **後製疊加文字**：唯一可靠解法。所有專業 AI 影片工作流都在生成後疊加文字/LOGO/字幕
+- 若必須在生成中包含文字：限制 **2–3 個大字元**，保持極簡（seedanceai.cc 建議）
+- Prompt 中明確寫 "avoid unreadable text, no distorted letters"（prompzone.com 實踐）
+- 在 scene bible 中預留文字位置，生成時 prompt 指定 "keep this area clean for text overlay"
+- [Q17](../02-seedance/q17-storyboard-practice/) 的教訓：storyboard 文字標註會滲入輸出——上傳前清除所有標註文字
+
+:::tip[🎬 導演要點]
+
+**不要在生成階段期待文字。** 所有招牌、LOGO、字幕、UI 文字——後製疊加。
+
+這是架構限制，不是 prompt 寫得不夠好。與其試 20 次期望文字突然變清楚，不如直接在後製軟體中疊加。
+
+:::
+
+:::note[📖 引用論文]
+[DiT (Peebles & Xie, ICCV 2023, §3–4)](https://arxiv.org/abs/2212.09748) — patchify 與 token 化。
+
+[LDM (Rombach et al., CVPR 2022, §3)](https://arxiv.org/abs/2112.10752) — VAE 感知壓縮 f=8。
+
+[Survey of Video Diffusion Models (TMLR 2025, §3.2)](https://arxiv.org/abs/2504.16081) — DiT 架構限制綜述。
+:::

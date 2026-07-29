@@ -1,6 +1,6 @@
 # Seedance2 Director Guide
 
-Static site. Custom build.mjs converts MDX→single-page HTML. 30 Q&A pages, 4 sections, zh-TW.
+Static site. Custom build.mjs converts MDX→single-page HTML. 33 Q&A pages, 4 sections, zh-TW.
 
 ## Commands
 | 用途 | 命令 |
@@ -11,7 +11,7 @@ Static site. Custom build.mjs converts MDX→single-page HTML. 30 Q&A pages, 4 s
 ## 架構
 - `src/content/docs/01-basics/` — Part 1: 擴散模型基礎 (Q1-Q8)
 - `src/content/docs/02-seedance/` — Part 2: Seedance 2.0 特性 (Q9-Q18)
-- `src/content/docs/03-diagnosis/` — Part 3: 問題診斷 (Q19-Q26)
+- `src/content/docs/03-diagnosis/` — Part 3: 問題診斷 (Q19-Q29)
 - `src/content/docs/04-workflow/` — Part 4: 實戰工作流
 - `build.mjs` — 讀 MDX → 解析 frontmatter → 渲染 markdown → 注入 HTML 模板
 - `dist/` — 輸出 (index.html + static assets)
@@ -47,8 +47,18 @@ Static site. Custom build.mjs converts MDX→single-page HTML. 30 Q&A pages, 4 s
 - MDX 中圖片路徑用相對路徑（`latent-space.png`），**不可**用前導斜線（`/latent-space.png`）——GitHub Pages 部署在子目錄下，絕對路徑會指向 domain root 而非 repo root
 - `.answer img{max-width:100%;height:auto}` 已內建在 CSS 中，圖片自動 responsive，不需額外處理
 
+### Part 3 診斷題目特殊規範（僅 Part 3 適用，Part 1/2/4 不強制）
+
+**標題格式**：`白話現象描述（English Term）——中文補充說明`。先讓讀者認出「這就是我遇到的問題」，再給術語。例：`畫面一直閃、顏色太豔（Flicker & Oversaturation）——閃爍與過飽和`。
+
+**理論優先**：根因解釋優先引用 Part 1/2 已建立的理論架構（Cross-Attention、CFG/SNR、Temporal Attention 等），跨 Q 用相對路徑超連結。論壇意見（Reddit、社群文檔）僅在兩種情況下保留：(a) 理論未覆蓋的解法 (b) 理論描述不足的現象描述。不要在理論已能解釋的地方引用 Reddit。
+
+**熱度排序**：Part 3 的 sidebar.order 按社群討論熱度排列（Reddit 貼文量、技術部落格覆蓋率、GitHub issues 數量），最常見/最困擾的問題排最前面，讓讀者優先看到最可能遇到的問題。
+
+**三層對照**：每題提供 ComfyUI（通用節點解法）和 Seedance 原生（prompt/@ 標籤解法）兩套方案，讓使用不同工具的讀者都能對照。
+
 ## 約定
-- **檔案命名**: `q##-slug.mdx`，編號跨章節連續 (Q1–Q26)
+- **檔案命名**: `q##-slug.mdx`，編號跨章節連續 (Q1–Q29)
 - **Frontmatter**: `title`, `description`, `sidebar: { order: N }`
 - **內文結構**: `## 一句話` → 子章節（WHY→WHAT→HOW）→ `:::tip[🎬 導演要點]` → `:::note[📖 引用論文]`
 - **標題鏈**: Part 1 標題設計為追問鏈，前半句承接上個 Q 的結論、後半句拋新問題

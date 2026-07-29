@@ -1,0 +1,52 @@
+---
+title: 換個鏡頭，房間裡的東西全變了（Cross-Shot Background Inconsistency）——跨鏡頭場景不連戲
+description: Cross-Attention 的 Identity Locking 偏向人物，背景物體缺乏專門的 identity embedding——每 shot 獨立生成，場景 layout 不繼承
+sidebar:
+  order: 11
+---
+
+## 一句話
+
+同一個房間，換個鏡頭後家具位置變了、桌上的杯子不見了、牆上的畫換了——[Q4：注意力機制](../01-basics/q04-attention/) 的 Cross-Attention Identity Locking 只鎖人物臉部，背景物體缺乏專門的 identity embedding。[Q16：Storyboard](../02-seedance/q16-storyboard/) 的 Shot Decomposition 每 shot 獨立生成，不繼承場景 spatial layout。
+
+## WHY：為什麼背景不會自動一致？
+
+[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 Identity Embedding 機制專門針對**人物臉部**設計——`@image1` 把參考圖的視覺特徵灌進 Cross-Attention，確保角色跨 shot 不變臉。但這個機制有一個盲點：Embedding Slot 在訓練中被優化來捕捉**人物特徵**（面部幾何、膚色、髮型）——背景物體（家具、牆壁、裝飾）不在 Identity Embedding 的訓練目標內。
+
+[Q16：Storyboard](../02-seedance/q16-storyboard/) 的 Shot Decomposition 機制進一步解釋：每個 shot 是獨立生成的——panel 1 對應 shot 1、panel 2 對應 shot 2。Cross-Attention 在每個 shot 中重新查閱參考圖，但**只繼承人物 reference，不繼承場景 spatial layout**。Shot 1 的「書桌靠左牆」和 Shot 2 的「書桌靠右牆」對模型來說沒有矛盾——因為模型根本沒有跨 shot 的場景記憶。
+
+## WHAT：位置編碼沒有全局場景座標
+
+[Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼標記每個 token 在「這一幀」的空間位置——左上角、右下角、第 N 幀。但位置編碼是 **per-frame local coordinate**，不是全局場景座標。沒有「這個杯子在房間的 (x,y,z) 位置，跨 shot 保持一致」的機制。
+
+nemovideo.com 社群提出的解法是 **scene bible**：在 prompt 中手動寫死環境常數——家具位置、時間、指示牌、裝飾物——用文字描述代替模型本該有的 spatial memory。
+
+## HOW
+
+### ComfyUI
+
+- 背景參考圖 + Tile ControlNet 鎖定空間結構（引用 [Q4](../01-basics/q04-attention/) ControlNet 獨立路徑——對 latent 施加 explicit 空間約束）
+- 鎖定寬高比和解析度——避免觸發 [Q6](../01-basics/q06-timestep/) patch 網格重算
+
+### Seedance 2.0
+
+- **建立 scene bible**（nemovideo.com 方法）：在每個 shot 的 prompt 中重複寫入相同的環境描述——「書桌靠左牆，上面有咖啡杯和檯燈，牆上掛著一幅藍色抽象畫」
+- 背景參考圖：單獨上傳一張「空場景」照片作為 @image 背景鎖定
+- 鎖定寬高比和解析度
+- 減少跨 shot 的攝影機角度大幅變化——越相似的構圖，模型越容易維持 spatial consistency
+
+:::tip[🎬 導演要點]
+
+Seedance 2.0 的 Identity Locking 是**人臉專用**——不要期待它自動維持場景一致。
+
+**每個 shot 的 prompt 都寫死環境描述（scene bible）。** 這是手動彌補模型缺乏的場景記憶。寧可重複囉嗦，不要期待模型記得上一 shot 的房間長怎樣。
+
+:::
+
+:::note[📖 引用論文]
+[DiT (Peebles & Xie, ICCV 2023, §3.1–3.2)](https://arxiv.org/abs/2212.09748) — Cross-Attention 與位置編碼。
+
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — @ 標籤 Identity Embedding 機制。
+
+[Controllable Video Survey (Ma et al., §4.2)](https://arxiv.org/abs/2507.16869) — 控制信號注入與 spatial consistency。
+:::
