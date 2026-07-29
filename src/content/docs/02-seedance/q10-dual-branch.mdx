@@ -1,75 +1,92 @@
 ---
-title: 為什麼 Seedance 2.0 可以一次生成帶聲音的影片？——雙分支架構（Dual-Branch DiT）
-description: 雙分支架構（Dual-Branch DiT）讓畫面和聲音在同一個去噪過程中同步進化
+title: 為什麼可以一次生成帶聲音的影片？——雙分支架構（Dual-Branch DiT）
+description: 畫面 DiT 和聲音 DiT 在同一去噪過程中雙向交換資訊，確保影音同步生成
 sidebar:
   order: 2
 ---
 
 ## 一句話
 
-畫面去噪和聲音去噪，同一個過程、同一個時鐘、每一步互相傳訊號。
+同一去噪過程跑兩條平行的 DiT 分支——畫面一條、聲音一條——每一步透過雙向 cross-attention 互傳狀態，確保生成出的畫面與聲音在時間上對齊。
 
-傳統做法是兩個模型串聯——先生成靜音畫面，再事後配音。問題在於影片模型不知道後面會有聲音，音效模型只能看著已生好的畫面「猜」時間點。唇形在第 47 幀動、聲音在第 50 幀才觸發——差三幀就出戲。
+## 為什麼不能先生成畫面再配音？
 
-Seedance 2.0 的做法：[Seedance 1.5 Pro (§3)](https://arxiv.org/abs/2512.13507) 把 DiT 骨幹拆成 **Visual Branch（畫面去噪）** 和 **Audio Branch（聲音去噪）**——兩條平行線，但共用同一個去噪排程。論文稱之為「原生音視頻聯合生成（Native Audio-Visual Joint Generation）」。
+級聯做法（先 T2V 生靜音影片，再 V2A 補聲音）有結構性缺陷：影片模型生成時不知道後面會有聲音，嘴唇動作不為語音預留空間；音效模型只能看著已完成的畫面「猜」時間點——嘴唇在第 47 幀閉合、聲音在第 50 幀才觸發，差三幀就出戲。
 
-## 第一步：兩個分支，一個時鐘
+根源在於級聯把影音生成當成兩個獨立問題，但現實中的影音是同一物理事件的兩種表徵——嘴唇閉合和爆破音 /p/ 同時發生，不是先閉嘴再發聲。聯合生成（joint generation）在同一個過程裡同時產生兩種模態，每一步都能互相修正。
+
+## 雙分支 DiT 怎麼做到聯合生成？
+
+核心架構：兩個平行的 Diffusion Transformer（DiT）分支——Video Branch 處理畫面 latent，Audio Branch 處理聲音 latent——共享同一個去噪時序。每個 DiT block 內，video token 和 audio token 透過 **雙向 cross-attention** 互相讀取對方的當前狀態。
 
 ```
-Step t = 999:  [Visual: 全是雜訊]        [Audio: 全是雜訊]
-                        ↕  Cross-Modal Joint Module
-Step t = 998:  [Visual: 浮現輪廓]          [Audio: 浮現背景音]
-                        ↕
-...
-Step t = 0:    [Visual: 乾淨畫面]          [Audio: 對白+音效+BGM，三軌獨立]
+Step t = T（純雜訊）:
+  Video tokens ⇄ Bidirectional Cross-Attention ⇄ Audio tokens
+Step t = T-1:
+  Video tokens（浮現輪廓）⇄ Bidirectional Cross-Attention ⇄ Audio tokens（浮現背景音）
+  ...
+Step t = 0:
+  Video tokens（乾淨畫面）  Audio tokens（對白 + 音效 + 環境音）
 ```
 
-關鍵是：兩個分支的 t 永遠同步。每一步去噪，視覺 latent 和音訊 latent 都透過 **Cross-Modal Joint Module（跨模態聯合模組）** 交換當前的狀態。不是「先生成畫再生成音」，是「每一步畫和音一起進化」。
+這不是「一個生完再生另一個」，而是「每一步兩個一起進化」。這個架構在學術界已是共識——JavisDiT (ICLR 2026)、LTX-2 (2026) 等開源系統均採用 dual-branch DiT + bidirectional cross-attention。
 
-## 第二步：雙向資訊流
+### 機制一：雙向 Cross-Attention 怎麼運作？
 
-**音 → 畫**：音訊分支把語音的**音素時間點（phoneme timing）**——哪個音在什麼時候發出——傳給畫面分支。/p/ 音（雙唇爆破）→ 對應幀嘴唇區域 latent 調整：雙唇閉合、爆破張開。Seedance 1.5 Pro 論文揭露了雙分支架構，但 phoneme 級別的同步細節未在論文中展開。產品文檔（seedance.tv）實測數據：乾淨錄音唇形延遲 40–80ms，嘈雜錄音 120–200ms。社群最佳實踐：10s 內 ≤12 詞，句子間加停頓標記作重同步錨點。
+在每個 DiT block 中：video token 的 query（Q_v）對 audio token 的 key（K_a）計算 attention 矩陣，乘上 audio token 的 value（V_a），得到 audio→video 的跨模態資訊；反過來，attention 矩陣的轉置乘上 video 的 value（V_v），得到 video→audio 的跨模態資訊。兩個方向的資訊流在同一層內完成。
 
-**畫 → 音**：畫面分支在產生碰撞（杯子落地、腳步著地）時，在對應幀的 latent 中留下特徵變化。Joint Module 把事件訊號傳給音訊分支，觸發 Foley 音效。重點：不是從音效庫選一個播放——是根據碰撞強度、材質、空間距離**從零合成**。「靴子踩濕鵝卵石」和「球鞋踩硬木地板」產出完全不同的腳步聲。
+LTX-2 進一步引入 **cross-modality AdaLN**：某個分支的 timestep embedding 不只條件自己的 layer norm，也條件對方的——確保兩個分支的 denoising 進度同步。Video 在 step t 的 denoising 程度會直接影響 Audio 在 step t 要注入多少雜訊，反之亦然。
 
-## Prompt 中的對白文字怎麼變成語音？
+### 機制二：時間對齊——怎麼確保第 47 幀的嘴唇對上第 47 幀的聲音？
 
-到這裡，你可能注意到一個缺口：雙分支架構解釋了音和畫怎麼同步，但「對白文字本身怎麼變成聲音」——Seedance 論文**沒有描述**。以下是基於產品行為和學術界相近研究的推論。
+Video token 和 audio token 本質上是不同頻率的時間序列：video 是 24 fps 的幀序列，audio 是 mel-spectrogram 的時間切片（例如每 1/25 秒一個 token）。要讓 cross-attention 知道「第 47 幀的畫面 token」和「對應時間點的聲音 token」是同一時刻，需要顯式的時間位置對齊。
 
-### 產品行為：雙引號 = 觸發 TTS
+JavisDiT++ 提出 **TA-RoPE（Temporal-Aligned RoPE）**：video token 的 3D position ID 中，時間維度（第 0 維）直接對齊 audio token 的時間維度——同一時間窗口的 video frame 和 audio segment 得到相同的 temporal position ID，RoPE 旋轉位置編碼本身就隱含「這些 token 是同一時刻」。LTX-2 採用簡化版本：跨模態 cross-attention 時只使用 temporal 維度的 1D RoPE，強制 attention 沿時間軸對齊。
 
-從社群實測和平台文檔（seedance.tv、opusly.ai、replicate、fal.ai）可以確認：Seedance 2.0 把 prompt 中雙引號 `"..."` 內的文字標記為 **spoken dialogue**，路由到 Audio Branch 生成對應語音。雙引號外的文字則作為場景描述，路由到 Video Branch。角色的**聲線（音色、年齡、性別、口音）** 由 prompt 中的角色描述推斷——例如「画家莫奈」→ 年長男性、沉穩語調。上傳的音訊檔案（@Audio1）是**節奏和語調的參考**，不是語音克隆來源。
+結果是：cross-attention 學到 emergent correspondence——杯子落地的畫面特徵變化自然觸發撞擊音效的 latent 變化，不需要顯式標記「這裡有碰撞事件」。
 
-### 學術界相近做法（非 Seedance 官方）
+### 機制三：訓練策略——為什麼不能從頭訓練？
 
-目前最接近的學術論文是 [OmniTalker（Wang et al., NeurIPS 2025）](https://arxiv.org/abs/2504.02433)——同樣採用 dual-branch DiT 架構，從文字同時生成語音和說話人臉。其 Audio Branch 的內部流程為：**text encoder → duration predictor（預測每個音素的持續時間）→ mel-spectrogram diffusion（去噪生成頻譜）→ vocoder（頻譜轉波形）**。淺層 DiT block 中的 cross-modal fusion 確保 phoneme 級別的唇形同步。[Talker-T2AV（2026）](https://arxiv.org/abs/2604.23586) 則指出 pervasive cross-modal attention 對 talking head 是次優的——語音和臉部在高層語意上相關，但低層信號（波形 vs. 像素紋理）的生成路徑應該分開。Seedance 2.0 實際採用哪種策略，官方未揭露。
+Dual-branch DiT 不是從零訓練的。標準做法（JavisDiT 提出，後續系統全部採用）：
+
+1. **Audio 預訓練**：用 video branch 的預訓練權重初始化 audio branch，在純音頻資料上訓練，確保單模態品質
+2. **凍結 self-attention，只訓練 cross-attention**：video 和 audio 各自的 self-attention 層已學會模態內的生成能力，凍結它們，只讓 cross-attention 層學習跨模態對齊
+3. **偏好優化（可選）**：JavisDiT++ 引入 AV-DPO，用 reward model 評估影音品質、一致性、同步度，優化生成結果與人類偏好的對齊
+
+## Seedance 2.0 的產品聲稱
+
+Seedance 1.5 Pro 和 2.0 論文對 dual-branch DiT 的架構描述僅限於「採用 MMDiT 架構」一句話，未揭露 cross-attention 設計、訓練策略、或 audio branch 內部結構。
+
+以下來自 Seedance 2.0 Model Card 的產品描述，機制未經論文驗證：
+
+- **Multi-track 輸出**：同時輸出對白、環境音、背景音樂三條音軌
+- **Binaural audio**：雙耳立體聲——Seedance 2.0 聲稱具備此能力，但未描述空間音訊的計算方式
+- **雙引號觸發語音**：prompt 中 `"..."` 內文字路由到 audio branch 生成語音（社群實測確認的產品行為，非論文描述）
 
 :::caution[⚠️ 誠實揭露]
-以上 TTS 內部流程的描述來自 OmniTalker（阿里巴巴）論文，非 Seedance 官方。Seedance 1.5 Pro 和 2.0 Model Card 均未描述 Audio Branch 內部的 TTS 實現細節。聲線推斷的行為來自社群實測和平台文檔。
+本 Q 中的雙向 cross-attention、cross-modality AdaLN、TA-RoPE 等機制描述來自學術界公開論文（JavisDiT / LTX-2 / JavisDiT++），非 Seedance 官方揭露。Seedance 的實際 dual-branch 實作方式未公開。
 :::
 
-## 第三步：音訊分支內部——三條獨立音軌 + 空間定位
+### Talker-T2AV 的批判
 
-音訊分支不是生出一條混合音軌。它在潛在空間中平行解算三條獨立軌道：
-
-- **對白/配音**：和畫面分支唇形特徵雙向對齊
-- **環境音（Ambience）**：根據畫面場景自動生成——雨景有雨聲、森林有鳥鳴
-- **背景音樂（BGM）**：根據 Prompt 情緒和場景風格生成
-
-最後透過**雙耳立體聲編碼（Binaural Audio Encoding）**，結合畫面 3D 空間資訊（角色距離、左右位置），自動計算 **ITD（雙耳時間差）** 和 **ILD（雙耳聲級差）**——你戴耳機聽，聲音有方向感。
+Talker-T2AV (2026) 指出：dual-DiT 在每個 denoising step 都做 pervasive cross-modal attention 可能次優——語音和臉部動作在高層語意和時間上高度相關，但低層信號（聲波 vs. 像素紋理）的生成路徑本質不同。強制在所有層級做 joint modeling 會導致不必要的糾纏和效率損失。這個批判指向 dual-DiT 的下一個演進方向：高層做 joint modeling，低層分開渲染。
 
 :::tip[🎬 導演要點]
-- **ComfyUI 無法重現原生雙分支去噪**——這是訓練階段嵌入權重的機制，推理端只能走級聯（靜音影片 → 外掛 MMAudio/AudioLDM），同步精度有落差
-- 對白場景控制在 10 秒內、12–20 個詞；句子間加停頓標記作為重同步錨點
-- 多人對白和複雜音效疊加仍是開放問題——論文也承認
+- dual-branch DiT 的同步精度來自訓練階段嵌入的 cross-attention 權重——外部工具（ComfyUI 的級聯 MMAudio/AudioLDM）無法重現同等精度
+- 對白場景控制在 10 秒內、12–20 個詞；句子間加停頓標記作重同步錨點
+- 多人對白和複雜音效疊加仍是開放問題——Seedance 2.0 論文也承認
 :::
 
 :::note[📖 引用論文]
-[Seedance 1.5 Pro §3–4](https://arxiv.org/abs/2512.13507) — 雙分支 DiT、Cross-Modal Joint Module 原始設計。
+[Seedance 1.5 Pro](https://arxiv.org/abs/2512.13507) — 提出 dual-branch DiT + cross-modal joint module 概念（架構細節未揭露）。
 
-[Seedance 2.0 Model Card §1–2](https://arxiv.org/abs/2604.14148) — 雙耳音訊、多軌輸出（對白/環境音/BGM）、音畫同步評測。
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 聲稱 multi-track 輸出、binaural audio（機制未揭露）。
 
-[OmniTalker (NeurIPS 2025)](https://arxiv.org/abs/2504.02433) — dual-branch DiT 做 text→speech+talking face 的學術參考（非 Seedance）。
+[JavisDiT (ICLR 2026)](https://arxiv.org/abs/2503.23377) — dual-branch DiT with bidirectional cross-attention，每個 block 內 video↔audio 雙向交互。
 
-[Talker-T2AV (2026)](https://arxiv.org/abs/2604.23586) — 指出 pervasive cross-modal attention 對 talking head 為次優。
+[LTX-2 (2026)](https://arxiv.org/abs/2601.03233) — 14B video + 5B audio asymmetric dual-stream，cross-modality AdaLN + 1D temporal RoPE，開源。
+
+[JavisDiT++ (ICLR 2026)](https://arxiv.org/abs/2602.19163) — TA-RoPE 實現 frame-level 影音時間對齊，MS-MoE 分離跨模態交互與模態內聚合。
+
+[Talker-T2AV (2026)](https://arxiv.org/abs/2604.23586) — 指出 pervasive cross-modal attention 在高層語意有效，但在低層信號渲染為次優。
 :::
