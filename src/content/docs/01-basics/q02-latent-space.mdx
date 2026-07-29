@@ -9,7 +9,7 @@ sidebar:
 
 Q1 說模型從雜訊中雕刻。但雕在哪？——不在像素上。模型先把畫面轉成一張只保留「形」的語意草圖，在這張草圖上動刀。這張草圖就是<span class="kw">潛在空間（Latent Space）</span>。
 
-![Stable Diffusion 架構圖：Pixel Space → VAE Encoder → Latent Space → Denoising → VAE Decoder → Pixel Space](/latent-space.png)
+![Stable Diffusion 架構圖：Pixel Space → VAE Encoder → Latent Space → Denoising → VAE Decoder → Pixel Space](latent-space.png)
 
 ## 為什麼不能在像素上直接雕刻？
 
@@ -21,7 +21,7 @@ Q1 說模型從雜訊中雕刻。但雕在哪？——不在像素上。模型�
 
 ## 潛在空間：只保留「形」的語意草圖
 
-解法：先用 VAE 把 512×512 像素轉成一張 64×64 的語意網格。這張網格存的不是顏色，是結構——「這裡是臉的輪廓」「那裡是光影的邊界」。
+解法：先用 VAE（Variational Autoencoder，變分自編碼器）把 512×512 像素轉成一張 64×64 的語意網格。這張網格存的不是顏色，是結構——「這裡是臉的輪廓」「那裡是光影的邊界」。
 
 這不是把圖縮小，是把圖轉成另一種語言：從「這個點什麼顏色」變成「這裡有什麼結構」。
 
