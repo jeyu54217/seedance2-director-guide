@@ -11,7 +11,7 @@ sidebar:
 
 ## 逐步走訪
 
-1. **文字編碼**：Prompt → **Text Encoder**（CLIP / T5-XXL）→ Text Embedding（Q4）。
+1. **文字編碼**：Prompt → **Text Encoder**（CLIP；業界頂尖模型如 Imagen 用 T5-XXL）→ Text Embedding（Q4）。Seedance 2.0 未揭露內部 text encoder 選型。
 2. **參考素材編碼**（選擇性）：參考圖/影片 → **VAE Encoder** → Image/Video Latent（Q2）。
 3. **生成初始雜訊**：隨機 latent，尺寸匹配目標畫面。雕刻的起點（Q1）。
 4. **迭代去噪（N 步核心迴圈）**：
