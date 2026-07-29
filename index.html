@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'neutral',securityLevel:'loose'});</script>
+<meta name="theme-color" content="#faf9f6">
+<meta name="description" content="AI 仿真人劇導演的進階技術知識手冊 — 理解擴散模型、DiT、Flow Matching 底層原理，精準操控 Seedance 2.0 工作流。15+ 篇論文導讀，ComfyUI 實戰節點速查。">
+<meta name="keywords" content="Seedance 2.0, AI video generation, diffusion model, DiT, Flow Matching, ComfyUI, director guide, 擴散模型, 影片生成, 導演">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://jeyu54217.github.io/seedance2-director-guide/">
+<meta property="og:title" content="Seedance 2.0 導演技術背景學習指引">
+<meta property="og:description" content="AI 仿真人劇導演的進階技術知識手冊 — 理解底層模型，精準操控工作流。15+ 篇論文導讀，ComfyUI 實戰。">
+<meta property="og:url" content="https://jeyu54217.github.io/seedance2-director-guide/">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Seedance 2.0 導演技術背景學習指引">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"TechArticle","headline":"Seedance 2.0 導演技術背景學習指引","author":{"@type":"Person","name":"Claude Fable 5"},"datePublished":"2026-07-25","inLanguage":["zh-TW","zh-CN"]}
+</script>
+<title>Seedance 2.0 導演技術背景學習指引</title>
+<style>
+  :root{--bg:#faf9f6;--card:#fff;--text:#1a1a1a;--muted:#6b6b6b;--border:#e5e0d8;--accent:#c44f1c;--accent-light:#fdf0e8;--code-bg:#f4f0eb;--tag-bg:#f0ebe3;--tag-text:#8b6f4e;--good:#2d7d46;--warn:#b68b2c;--bad:#c44f1c;--blue:#1a6fb5;--blue-light:#e8f2fa}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Noto Sans TC","PingFang TC","Noto Sans SC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.8;-webkit-tap-highlight-color:transparent}
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:2.5rem 1.5rem 2rem;text-align:center}
+  header h1{font-size:1.75rem;font-weight:700;letter-spacing:-.02em}
+  header .sub{color:var(--muted);font-size:.95rem;margin-top:.5rem}
+  header .meta{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:1rem}
+  header .meta span{font-size:.8rem;background:var(--tag-bg);color:var(--tag-text);padding:.2rem .7rem;border-radius:999px}
+  .toolbar{max-width:860px;margin:1.5rem auto 0;padding:0 1.5rem;display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap}
+  .toolbar button{background:var(--card);border:1px solid var(--border);color:var(--text);padding:.4rem 1rem;border-radius:8px;cursor:pointer;font-size:.84rem;font-family:inherit;transition:all .15s;white-space:nowrap}
+  .toolbar button:hover{background:var(--accent-light);border-color:var(--accent)}
+  #lang-toggle{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+  #lang-toggle:hover{background:#a03d10;border-color:#a03d10}
+  main{max-width:860px;margin:1rem auto 3rem;padding:0 1.5rem}
+  .section-header{font-size:1.25rem;font-weight:700;color:var(--accent);margin:2.5rem 0 1rem;padding-bottom:.5rem;border-bottom:2px solid var(--border)}
+  .section-header:first-child{margin-top:0}
+  details{background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:.9rem;transition:box-shadow .15s}
+  details[open]{box-shadow:0 2px 20px rgba(0,0,0,.06)}
+  summary{padding:1rem 2.4rem 1rem 1.3rem;cursor:pointer;font-weight:700;font-size:1rem;list-style:none;position:relative;user-select:none;line-height:1.55;border-radius:10px}
+  summary:hover{background:#fdfaf7}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:'\25B8';position:absolute;right:1.2rem;top:50%;transform:translateY(-50%);font-size:.85rem;color:var(--accent);transition:transform .2s}
+  details[open]>summary::before{transform:translateY(-50%) rotate(90deg)}
+  details[open]>summary{border-radius:10px 10px 0 0;background:#fdfaf7}
+  .answer{padding:.8rem 1.5rem 1.5rem}
+  .answer h3{font-size:1.05rem;font-weight:700;color:var(--text);margin:1.2rem 0 .6rem;padding-bottom:.3rem;border-bottom:1px solid var(--border)}
+  .answer h3:first-child{margin-top:.3rem}
+  .answer h4{font-size:.92rem;font-weight:700;color:var(--accent);margin:1rem 0 .5rem;padding-bottom:.2rem;border-bottom:1px dotted var(--border);letter-spacing:.02em}
+  .answer p{margin-bottom:.6rem}
+  .answer strong{color:var(--accent)}
+  .answer ul,.answer ol{margin:.4rem 0 .8rem 0;padding-left:0;list-style:none}
+  .answer li{margin-bottom:.5rem;padding-left:1.3rem;position:relative;line-height:1.65}
+  .answer li::before{content:'\2022';position:absolute;left:.25rem;color:var(--accent);font-weight:700;font-size:1.1em}
+  .answer ol{counter-reset:step}
+  .answer ol li{padding-left:1.6rem}
+  .answer ol li::before{content:counter(step);counter-increment:step;left:.1rem;top:.15rem;font-size:.72rem;font-weight:700;background:var(--accent);color:#fff;width:1.05rem;height:1.05rem;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;position:absolute}
+  .kw{font-weight:700;color:var(--accent)}
+  a.paper{color:var(--blue);text-decoration:none;border-bottom:1px dotted var(--blue);font-weight:600;font-size:.92em}
+  a.paper:hover{color:var(--accent);border-bottom-color:var(--accent)}
+  .cite-block{background:var(--blue-light);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;padding:.7rem 1rem;margin:1rem 0 0;font-size:.84rem;line-height:1.6}
+  .cite-block strong{color:var(--blue);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem}
+  .cite-block a{color:var(--blue)}
+  .highlight-box{background:var(--accent-light);border:1px solid #f0d8c8;border-radius:8px;padding:.9rem 1.1rem;margin:.9rem 0;font-size:.9rem;line-height:1.65}
+  .highlight-box strong{color:var(--accent)}
+  .warn-box{background:#fef9f0;border:1px solid #f0e0c0;border-radius:8px;padding:.9rem 1.1rem;margin:.9rem 0;font-size:.9rem;line-height:1.65}
+  .warn-box strong{color:var(--warn)}
+  .note-box{background:#fef9f4;border:1px solid #f0e0c8;border-radius:6px;padding:.5rem .9rem;margin:.7rem 0;font-size:.85rem;color:var(--muted)}
+  .tag{display:inline-block;font-size:.7rem;font-weight:700;padding:.12em .55em;border-radius:3px;margin-right:.35rem;vertical-align:middle;letter-spacing:.03em}
+  .tag-c{background:#fce8e0;color:var(--accent)}.tag-s{background:#e8f2fa;color:var(--blue)}
+  .tbl-wrap{overflow-x:auto;margin:.6rem 0 1rem;-webkit-overflow-scrolling:touch}
+  .answer table{width:100%;border-collapse:collapse;font-size:.86rem;min-width:500px}
+  .answer th,.answer td{border:1px solid var(--border);padding:.55rem .75rem;text-align:left;vertical-align:top}
+  .answer th{background:#faf7f3;font-weight:700;font-size:.8rem;color:var(--muted);white-space:nowrap}
+  .answer td{line-height:1.6}
+  .answer td:first-child{font-weight:600}
+  .answer tr:nth-child(even) td{background:#fdfaf7}
+  .answer code{background:var(--code-bg);padding:.15em .5em;border-radius:4px;font-size:.87em;font-family:"SF Mono","Fira Code","Cascadia Code",monospace;color:#8b4513;font-weight:500}
+  .answer pre{background:var(--code-bg);padding:.9rem 1.1rem;border-radius:8px;overflow-x:auto;font-size:.81rem;line-height:1.55;margin:.7rem 0 1rem;border:1px solid var(--border)}
+  .answer pre code{padding:0;background:none;font-size:inherit;color:inherit}
+  .answer blockquote{border-left:3px solid var(--accent);padding:.6rem 1rem;margin:.8rem 0;background:var(--accent-light);border-radius:0 8px 8px 0;font-size:.92rem}
+  .badge{display:inline-block;font-size:.7rem;font-weight:700;padding:.15em .55em;border-radius:999px;margin-right:.3rem}
+  .badge-yes{background:#e6f4ea;color:var(--good)}.badge-partial{background:#fef7e0;color:var(--warn)}.badge-no{background:#fce8e0;color:var(--bad)}
+  footer{text-align:center;padding:2.5rem 1.5rem;color:var(--muted);font-size:.82rem;border-top:1px solid var(--border);max-width:860px;margin:3rem auto 0}
+  footer a{color:var(--accent);text-decoration:none}
+  .mermaid{text-align:center;margin:1rem 0;padding:.5rem}
+  .mermaid svg{max-width:100%;height:auto}
+  @media(max-width:600px){
+    header{padding:1.8rem 1rem 1.5rem}
+    header h1{font-size:1.35rem}
+    header .sub{font-size:.88rem}
+    header .meta{gap:.5rem}
+    header .meta span{font-size:.74rem;padding:.15rem .55rem}
+    .toolbar{padding:0 1rem;gap:.4rem;justify-content:center}
+    .toolbar button{min-height:44px;padding:.5rem 1rem;font-size:.88rem}
+    .section-header{font-size:1.1rem;margin:2rem 0 .8rem}
+    main{padding:0 1rem}
+    .answer{padding:.6rem 1rem 1.2rem}
+    .answer h3{font-size:.98rem}
+    .answer h4{font-size:.87rem}
+    .answer table{font-size:.78rem;min-width:400px}
+    .answer td,.answer th{padding:.4rem}
+    .answer li{padding-left:1.1rem}
+    .answer pre{font-size:.75rem;padding:.7rem .85rem}
+    summary{padding:.85rem 2.2rem .85rem 1.1rem;font-size:.94rem}
+    summary::before{right:1rem;font-size:.8rem}
+    .cite-block{padding:.6rem .85rem;font-size:.8rem}
+    .highlight-box,.warn-box{padding:.75rem .9rem;font-size:.85rem}
+    footer{padding:2rem 1rem;font-size:.78rem}
+  }
+  @media(min-width:601px) and (max-width:900px){
+    header{padding:2.2rem 1.5rem 1.8rem}
+    header h1{font-size:1.55rem}
+    .section-header{font-size:1.15rem}
+    .answer table{min-width:450px}
+    summary{font-size:.97rem}
+  }
+  @media print{
+    body{background:#fff;color:#000}
+    header{background:#fff;border-bottom:1px solid #ccc}
+    details{border:1px solid #ccc;break-inside:avoid}
+    details[open]{box-shadow:none}
+    .toolbar{display:none}
+    footer{border-top:1px solid #ccc}
+  }</style>
+</head>
+<body>
+
+<header>
+  <h1>🎬 Seedance 2.0 導演技術背景學習指引</h1>
+  <p class="sub">針對 AI 仿真人劇導演的進階技術知識手冊 — 理解底層模型，精準操控工作流</p>
+  <div class="meta">
+    <span>📅 2026-07-25</span><span>🎯 非技術背景友善</span><span>📖 15+ 篇論文導讀</span><span>🔧 ComfyUI 實戰</span>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button onclick="document.querySelectorAll('details').forEach(d=>d.open=true)">📖 全部展開</button>
+  <button onclick="document.querySelectorAll('details').forEach(d=>d.open=false)">📕 全部折疊</button>
+  <button id="lang-toggle" onclick="toggleLang()">繁</button>
+</div>
+
+<main>
+
+<!-- ===== PART 1: FOUNDATIONS ===== -->
+<h2 class="section-header">一、一個畫面是怎麼生出來的？</h2>
+
+<details id="q1"><summary>Q1: 什麼是擴散模型（Diffusion Model）？為什麼說它是「雕出」畫面？</summary><div class="answer">
+
+<h4>一句話：模型像雕刻家——不是「加上」畫面，而是從雜訊裡「鑿掉」不屬於畫面的部分</h4>
+<p>米開朗基羅說：<strong>「大衛本來就在大理石裡，我只是把不屬於他的部分去掉。」</strong></p>
+<p>擴散模型做完全一樣的事。最終畫面本來就藏在雜訊裡——模型每一步預測「哪些是雜訊」，鑿掉它。鑿夠多次，畫面浮出來。</p>
+
+<h4>訓練：讓模型學會「什麼該鑿」</h4>
+<p>模型要先會分辨「大理石」和「雕像」。方法：拿真實圖片，用數學公式一步一步往上灑高斯雜訊（Gaussian Noise），灑到最後什麼都看不見——就像把雕像敲回大理石原石。每一步加多少雜訊是固定公式，不需要學習。</p>
+<p>這是<span class="kw">人類做的事</span>，不是模型。目的：產生成千上萬組「雜訊圖 → 乾淨圖」配對，當作<span class="kw">訓練教材</span>。模型看著這些教材學會一件事：<strong>「給我一張髒圖，我能指出髒在哪。」</strong></p>
+
+<pre class="mermaid">
+flowchart LR
+    A["🖼️ 真實圖片"] -->|"灑雜訊（做教材）<br/>把雕像敲回石頭"| B["🧊 純雜訊<br/>大理石原石"]
+    B -->|"預測雜訊 → 鑿掉（雕刻）<br/>模型做的事"| C["🖼️ 生成圖片<br/>雕像浮現"]
+</pre>
+
+<p style="text-align:center;font-size:.85rem;color:var(--muted);margin-top:-.5rem">▲ 左半＝人類做教材（雕像→石頭） · 右半＝模型做雕刻（石頭→雕像）</p>
+
+<h4>生成：一刀一刀，把畫面從雜訊裡鑿出來</h4>
+<p>訓練完後，給模型一團純雜訊。它做的事很單純：</p>
+<p>1. 看著現在這團雜訊，預測「這一步有哪些是雜訊」<br>
+2. 把雜訊鑿掉（減去預測的雜訊）<br>
+3. 重複，直到雜訊清乾淨，畫面浮出來</p>
+<p>這就是<span class="kw">預測雜訊（Noise Prediction）</span>——模型不是一筆一筆「畫出」畫面，而是一刀一刀「去掉」不屬於畫面的東西。和 Stable Diffusion、Seedance 2.0 的實際運作方式一致。</p>
+
+<pre><code>訓練：   真實圖片 ──灑雜訊──→ 模糊一點 ──再灑──→ 更糊 ──→ ... ──→ 一團雜訊（大理石原石）
+         （人類用數學公式，純手工做教材）
+
+生成：   一團雜訊 ──鑿一刀──→ 浮現輪廓 ──再鑿──→ 光影出來 ──→ ... ──→ 最終畫面（雕像）
+         （模型做的事：反覆「找雜訊→鑿掉」。一刀一刀，像雕刻）</code></pre>
+
+<div class="highlight-box"><strong>🎬 作為導演，這代表什麼</strong><br>
+<span class="kw">Steps（鑿幾刀）</span>太少 → 雜訊沒清乾淨，畫面模糊。太多 → 浪費時間，通常 <strong>20–30 步</strong>足夠。<br>
+去噪<strong>前段</strong>（前幾刀）決定構圖、姿態、光影方向。<strong>後段</strong>（後幾刀）決定皮膚紋理、衣服褶皺。調參數就是在決定「前段鑿大力一點還是後段鑿細一點」。<br>
+Prompt、參考圖、ControlNet = 告訴模型「雜訊在哪，往哪個方向鑿」。</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2006.11239">DDPM (Ho et al., NeurIPS 2020, §2–3)</a> — 前向加噪的數學定義與反向去噪的訓練目標。<br>
+<a class="paper" href="https://arxiv.org/abs/2112.10752">LDM (Rombach et al., CVPR 2022, §3)</a> — 實際生成時只用反向去噪，在潛在空間中執行。
+</div></div></details>
+
+<details id="q2"><summary>Q2: 什麼是潛在空間（Latent Space）？為什麼模型不直接在像素上雕刻？</summary><div class="answer">
+
+<h4>一句話：模型不在像素上雕刻——先把畫面壓成語意網格，雕完再放大回來。</h4>
+
+<h4>為什麼需要潛在空間？</h4>
+<p>Q1 說模型一刀一刀鑿掉雜訊。但 512×512 的畫面有 26 萬像素。一刀處理 26 萬個數字，20 刀就 500 萬次。家用 GPU 跑不動。</p>
+
+<p>解法：<strong>不在像素上動刀。</strong>先用 <span class="kw">VAE（Variational Autoencoder）</span>把畫面壓縮 64 倍，在壓縮後的網格上去噪，最後再放大回像素。這張壓縮網格就是<span class="kw">潛在空間（Latent Space）</span>。</p>
+
+<h4>VAE：像素 ⇄ 語意的雙向轉換器</h4>
+<p><strong>Encoder</strong> 把 512×512 像素壓成 64×64 網格——存的不是顏色，是語意（人臉輪廓、光影方向、物體邊界）。<strong>Decoder</strong> 把去噪完的 64×64 網格放大回 512×512 像素。</p>
+
+<pre><code>512×512 像素（26 萬個數字）
+       ↓  VAE Encoder 壓縮 64 倍
+64×64 語意網格（4 千個數字）← 去噪在這裡
+       ↓  VAE Decoder 還原
+512×512 像素（最終畫面）</code></pre>
+
+<h4>64 倍：消費級 GPU 跑得動的原因</h4>
+<p>512×512×3 → 64×64×4，運算量降 64 倍。Stable Diffusion 能在消費級 GPU 上跑，就是這一步。</p>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+Prompt 指揮的是<span class="kw">語意網格</span>，不是像素。<br>
+「站在左側，光從右來」→ 空間關係直接命中結構。<br>
+「紅衣服」→ 顏色是後段細節，不是第一優先。<br>
+<strong>Prompt 先講空間，再補顏色材質。</strong></div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2112.10752">LDM (Rombach et al., CVPR 2022, §3, §4.1)</a> — VAE Encoder/Decoder，f8 壓縮比（512×512×3 → 64×64×4），運算降 64 倍。
+</div></div></details>
+
+<details id="q3"><summary>Q3: 什麼是 Patchify（圖像區塊化）？為什麼 DiT 架構讓舊 Prompt 技巧全部失效？</summary><div class="answer">
+
+<h4>一句話：Transformer 讀不懂整張圖——切成 1024 塊 token 分批讀，再用 Attention 串回全局。</h4>
+
+<h4>Patchify：把語意網格切成 token</h4>
+<p>Q2 說模型在 64×64 語意網格上去噪。但 Transformer 看不懂整張圖——只能一小塊一小塊讀。</p>
+
+<p><span class="kw">Patchify</span>：把 64×64 網格切成小方塊。2×2 一刀，得 32×32=<strong>1024 塊</strong>。每塊是一個 <span class="kw">token</span>——模型能理解的最小單位。每個 token 貼上<span class="kw">位置編碼（Positional Encoding）</span>，標記它在畫面的哪裡。</p>
+
+<h4>U-Net vs DiT：視野決定 Prompt 寫法</h4>
+<p>切成 token 之後，<strong>誰來處理這些 token</strong>，決定了 Prompt 該怎麼寫：</p>
+
+<p>舊 Stable Diffusion 用 <span class="kw">U-Net（CNN）</span>——token 只看鄰居，視野窄。Prompt 技巧（堆關鍵字、加權括號）是為了在窄視野下強行引導模型。</p>
+
+<p>Seedance 2.0 用 <span class="kw">DiT（Diffusion Transformer）</span>——<strong>Self-Attention 讓任意兩個 token 直接對話</strong>，不管它們在畫面左上角還是右下角。視野全局，自然語言句子比關鍵字清單更有效。</p>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+Seedance 2.0 不吃舊 SD 的 Prompt 語法。<br>
+<span style="color:var(--bad)">✗ 舊（U-Net）：</span><code>"red dress, high quality, 8k, (detailed face:1.3)"</code><br>
+<span style="color:var(--good)">✓ 新（DiT）：</span><code>「穿紅裙的女人站在窗邊，午後陽光從左側照進來」</code><br>
+<strong>DiT 要場景描述，不要關鍵字清單。</strong></div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2212.09748">DiT (Peebles & Xie, ICCV 2023, §3–4)</a> — patchify 定義與 Self-Attention 全局視野。<br>
+<a class="paper" href="https://arxiv.org/abs/2504.16081">Survey of Video Diffusion Models (Wang et al., TMLR 2025, §3.2)</a> — U-Net→DiT 演進。
+</div></div></details>
+
+<details id="q4"><summary>Q4: token 之間怎麼溝通？什麼是注意力機制（Attention）？</summary><div class="answer">
+
+<h4>一句話：Attention 讓 token 互相對看、也看外部指令——Cross-Attention 是導演操控模型的入口。</h4>
+
+<h4>三種 Attention：Self、Cross、Temporal</h4>
+<p>劇組比喻最直接：<span class="kw">Self-Attention</span> = 演員對戲（手和臉要協調）。<span class="kw">Cross-Attention</span> = 演員看導演指示（接收 Prompt、參考圖）。<span class="kw">Temporal Attention</span> = 前後幀對戲（第 1 秒和第 5 秒同一個角色）。</p>
+<div class="tbl-wrap"><table>
+<tr><th>Attention 類型</th><th>白話</th><th>對導演來說</th></tr>
+<tr><td><span class="kw">Self-Attention</span></td><td>畫面內 token 互相看</td><td>確保角色手臉協調，不分裂</td></tr>
+<tr><td><span class="kw">Cross-Attention</span></td><td>token 看外部輸入</td><td><strong>👈 操控入口。</strong><code>@image1</code> 在這裡建立參考點</td></tr>
+<tr><td><span class="kw">Temporal Attention</span></td><td>跨幀 token 互相看</td><td>第 1 秒和第 5 秒同一個角色</td></tr>
+</table></div>
+
+<h4>Cross-Attention：導演操控模型的入口</h4>
+<p>Cross-Attention 是 token 接收外部指令的窗口——Prompt、參考圖、ControlNet 骨架全部從這裡注入。</p>
+<p><strong>參考圖為什麼會互相汙染？</strong><code>@image1</code>（紅衣）和 <code>@image2</code>（白衣）同時存在，Cross-Attention 沒正確隔離兩組 Key/Value → 紅色滲透到白色區。這就是<span class="kw">特徵污染（Feature Bleeding）</span>。解法：參考圖用純色背景的乾淨特寫。</p>
+
+<h4>Text Encoder：Prompt 怎麼被模型讀懂</h4>
+<p>Prompt 是中文字，模型讀不了。需要 <span class="kw">Text Encoder（文字編碼器）</span>轉成向量。最常用 <span class="kw">CLIP</span>——在數億組「圖片+文字」配對上訓練。三件事：</p>
+<p>(1) CLIP 對視覺詞敏感、對抽象詞較弱——多給具體視覺線索。<br>
+(2) CLIP 有 <strong>77 token 上限</strong>——長 Prompt 會被截斷，關鍵詞放前面。<br>
+(3) Seedance 2.0 用更強的 T5-XXL，上下文更長。</p>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+Cross-Attention 是操控入口——Prompt、@image1、ControlNet 全部走這條路。<br>
+參考圖用純色背景。兩個以上參考圖，色系差異越大越好。<br>
+Prompt 被 CLIP 編碼成向量，77 token 後截斷——關鍵資訊放前面。</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2212.09748">DiT §3.1</a> — Self/Cross-Attention。<br>
+<a class="paper" href="https://arxiv.org/abs/2308.06721">IP-Adapter (Ye et al., 2023, §3.2, §4)</a> — 解耦 Cross-Attention。<br>
+<a class="paper" href="https://arxiv.org/abs/2112.10752">LDM §4.2</a> — CLIP Text Encoder。
+</div></div></details>
+
+<details id="q5"><summary>Q5: Prompt 的影響力能調多大？什麼是 CFG（無分類器引導）？為什麼太高會崩壞？</summary><div class="answer">
+
+<h4>一句話：CFG 是 Prompt 服從度的強度旋鈕——太低模型放飛，太高訊號崩潰。</h4>
+
+<h4>CFG 怎麼運作</h4>
+<p>CFG 像汽車油門。1 = 怠速，4–7 = 正常巡航，>12 = 失控撞牆。</p>
+<p>技術上：每一步去噪，模型跑兩次預測——一次有 Prompt、一次沒有。CFG 在兩者之間做線性外推：CFG 越高，輸出越偏離「自由發揮」，越靠近「嚴格遵從 Prompt」。（<a class="paper" href="https://arxiv.org/abs/2207.12598">Ho & Salimans, 2022, §3</a>）</p>
+<p>超過臨界點 → <span class="kw">信噪比（SNR）崩潰</span>——模型把不該去掉的細節也當雜訊砍了。Q1 的雕刻比喻：鑿太用力，把雕像也鑿壞。</p>
+
+<h4>CFG 數值對照</h4>
+<div class="tbl-wrap"><table>
+<tr><th>CFG</th><th>效果</th><th>風險</th></tr>
+<tr><td>1–3</td><td>自由發揮</td><td>自然但不可控</td></tr>
+<tr><td>4–7</td><td>✅ 甜蜜點</td><td>多數場景</td></tr>
+<tr><td>7–10</td><td>嚴格遵從</td><td>可能過飽和</td></tr>
+<tr><td>>12</td><td>極度強制</td><td>⚠️ 肢體崩壞</td></tr>
+</table></div>
+
+<h4>RescaleCFG：防止崩壞的安全閥</h4>
+<p>去噪後段自動降 CFG，防止 SNR 崩潰（<a class="paper" href="https://arxiv.org/abs/2305.08891">Lin et al., WACV 2024, §3–4</a>）。ComfyUI 設 <strong>0.5–0.7</strong>。</p>
+
+<h4>代價：CFG>1 每一步跑兩次</h4>
+<p>有 Prompt 和無 Prompt 各預測一次 → 生成時間翻倍。拉高 CFG = 又慢又危險。</p>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+CFG 4–7 是甜蜜點。超過 10 開始危險，>12 肢體崩壞機率極高。<br>
+ComfyUI 開 RescaleCFG 0.5–0.7，Seedance 2.0 內建類似機制。<br>
+CFG 越高 = 越慢（每一步跑兩次），同時越容易崩。沒有免費午餐。</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2207.12598">CFG (Ho & Salimans, 2022, §3)</a>。<br>
+<a class="paper" href="https://arxiv.org/abs/2305.08891">RescaleCFG (Lin et al., WACV 2024, §3–4)</a>。
+</div></div></details>
+
+<details id="q6"><summary>Q6: 去噪這麼多步，模型怎麼知道每一步該做什麼？什麼是時間步調節（Timestep Conditioning）？</summary><div class="answer">
+
+<h4>一句話：時間步調節管進度（大局還是細節），位置編碼管座標（token 在畫面哪裡）。</h4>
+
+<h4>時間步調節（Timestep Conditioning）：烘焙計時器</h4>
+<p>蛋糕第 5 分鐘和第 25 分鐘需要不同火候。去噪也一樣——早期（t 大，全是雜訊）做構圖、姿態、光影；後期（t 小，接近乾淨）做皮膚紋理、衣服褶皺。</p>
+<p><a class="paper" href="https://arxiv.org/abs/2212.09748">DiT (Peebles & Xie, ICCV 2023, §3.2)</a> 用 <span class="kw">AdaLN-Zero</span>：小型 MLP 根據 timestep t 產生 scale（γ）和 shift（β），注入每個 Transformer Block。t=999 → 大開大合；t=10 → 小心翼翼。</p>
+
+<h4>位置編碼（Positional Encoding）：token 的 GPS</h4>
+<p>每個 token 需要知道自己在畫面哪裡——「我是左上角」「我是第 7 幀」。方法有兩種：正弦式（Sinusoidal）和旋轉式（RoPE）。Q3 的 Positional Encoding 就是在做這件事。</p>
+
+<h4>從圖片到影片：多一條時間軸</h4>
+<p>影片 DiT 把潛在空間從 2D（寬×高）擴到 3D（寬×高×時間）。位置編碼要同時標空間和幀號，Attention 新增 Temporal Attention 處理跨幀溝通。token 數量隨時間線性成長，attention 計算量隨 token 平方成長——這是影片比圖片難這麼多的核心原因（<a href="#q13">Q13</a> 展開）。</p>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+去噪前後段行為不同。<br>
+調構圖 → 動前段（ControlNet 介入時機、初期 CFG）。<br>
+調細節 → 動後段（RescaleCFG、FreeInit）。<br>
+前段管骨架，後段管皮膚——記住這個分界。</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2212.09748">DiT §3.2</a> — AdaLN-Zero。<br>
+<a class="paper" href="https://arxiv.org/abs/2504.16081">Survey of Video Diffusion Models §3.3</a> — 圖片→影片 DiT。
+</div></div></details>
+
+<details id="q7"><summary>Q7: 為什麼新模型幾十步就夠？什麼是 Flow Matching（流匹配）？</summary><div class="answer">
+
+<h4>一句話：DDPM 在濃霧中摸黑，Flow Matching 有 GPS 導航——方向已知，步伐可以大。</h4>
+
+<h4>DDPM：預測雜訊，一步一步擦</h4>
+<p>傳統擴散（DDPM）每一步預測「現在有多少雜訊，該擦掉多少」。像在濃霧中走迷宮——每步重新判斷方向。要走 1000 步才到終點。</p>
+
+<h4>Flow Matching：預測方向，跟著箭頭走</h4>
+<p>Flow Matching 不預測雜訊量——預測<span class="kw">「往乾淨畫面的方向是哪邊」</span>。這是一條連續的向量場（Vector Field），起點到終點是平滑曲線。方向早就確定了，步伐可以大。1000 步 → 50 步，品質一樣好。（<a class="paper" href="https://arxiv.org/abs/2210.02747">Lipman et al., ICLR 2023, §2–3</a>）</p>
+
+<h4>和 Q6 的關聯：連續時間讓 AdaLN 更平滑</h4>
+<p>Q6 的 AdaLN 需要 timestep t。DDPM 的 t 是離散的（1,2,3...1000）；Flow Matching 的 t 是連續的 [0,1]。AdaLN 在連續曲線上滑動，調節更平滑——不是 1000 級階梯，是一條斜坡。</p>
+
+<div class="warn-box"><strong>⚠️ 誠實揭露</strong><br>
+Seedance 2.0 論文是 Model Card，未明確說用 Flow Matching。但 SD3、FLUX、HunyuanVideo 全部基於此。MIT 課程（<a class="paper" href="https://arxiv.org/abs/2506.02070">Holderrieth et al., §4–5</a>）有入門圖解。</div>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+新模型 Steps 設 20–30 就夠——不是幻覺，是 Flow Matching 的數學保證。<br>
+舊「Steps 一定 50+」的經驗在新模型上不適用。<br>
+Seedance 2.0 沒公開確認用 Flow Matching，但行為完全一致。</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2210.02747">Flow Matching (Lipman et al., ICLR 2023, §2–3)</a>。<br>
+<a class="paper" href="https://arxiv.org/abs/2506.02070">MIT 課程 (Holderrieth et al., §4–5)</a>。
+</div></div></details>
+
+<details id="q8"><summary>Q8: 全部串起來——從 Prompt 到畫面，完整走一遍</summary><div class="answer">
+<h4>一句話：五站流水線——Prompt → 文字向量 → 初始雜訊 → N 步去噪 → 解碼成像素。</h4>
+
+<h4>逐步走訪</h4>
+<ol>
+<li><strong>文字編碼</strong>：Prompt → <span class="kw">Text Encoder</span>（CLIP / T5-XXL）→ Text Embedding（<a href="#q4">Q4</a>）。</li>
+<li><strong>參考素材編碼</strong>（選擇性）：參考圖/影片 → <span class="kw">VAE Encoder</span> → Image/Video Latent（<a href="#q2">Q2</a>）。</li>
+<li><strong>生成初始雜訊</strong>：隨機 latent，尺寸匹配目標畫面。雕刻的起點（<a href="#q1">Q1</a>）。</li>
+<li><strong>迭代去噪（N 步核心迴圈）</strong>：
+  <ul>
+    <li>a. Timestep t → <span class="kw">AdaLN</span> 調整行為模式（<a href="#q6">Q6</a>）</li>
+    <li>b. <span class="kw">Self-Attention</span>：token 對戲，建立內部一致性（<a href="#q4">Q4</a>）</li>
+    <li>c. <span class="kw">Cross-Attention</span>：token 查閱 Text Embedding + 參考素材（<a href="#q4">Q4</a>）</li>
+    <li>d. MLP：非線性變換，豐富表達</li>
+    <li>e. 預測雜訊 → 從 latent 減去 → 乾淨一點（<a href="#q1">Q1</a>）</li>
+  </ul>
+</li>
+<li><strong>解碼輸出</strong>：最終乾淨 latent → <span class="kw">VAE Decoder</span> → 像素畫面（<a href="#q2">Q2</a>）。</li>
+</ol>
+<p>到這裡，一個畫面從無到有的完整路徑就追完了。</p>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+每一步都標了對應的 Q——忘記哪個環節就跳回去看。<br>
+控制點總覽：Prompt（Q4 的 Text Encoder）、CFG（Q5）、Steps（Q7）、參考圖（Q4 的 Cross-Attention）、前後段參數（Q6）。</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2112.10752">LDM (Rombach et al., CVPR 2022, §3–4)</a> — 完整 pipeline。<br>
+<a class="paper" href="https://arxiv.org/abs/2212.09748">DiT (Peebles & Xie, ICCV 2023, §3)</a> — Transformer 去噪迴圈。
+</div></div></details>
+
+<!-- ===== PART 2: SEEDANCE 2.0 DEEP DIVE ===== -->
+<h2 class="section-header">二、Seedance 2.0 和其他模型最不一樣的地方</h2>
+
+<details id="q9"><summary>Q9: 為什麼 Seedance 2.0 可以一次生成帶聲音的影片？雙分支架構（Dual-Branch DiT）怎麼讓畫面和聲音同步？</summary><div class="answer">
+
+<h4>一句話：畫面去噪和聲音去噪，同一個過程、同一個時鐘、每一步互相傳訊號</h4>
+<p>傳統做法是兩個模型串聯——先生成靜音畫面，再事後配音。問題在於影片模型不知道後面會有聲音，音效模型只能看著已生好的畫面「猜」時間點。唇形在第 47 幀動、聲音在第 50 幀才觸發——差三幀就出戲。</p>
+<p>Seedance 2.0 的做法：<a class="paper" href="https://arxiv.org/abs/2512.13507">Seedance 1.5 Pro (§3)</a> 把 DiT 骨幹拆成 <span class="kw">Visual Branch（畫面去噪）</span>和 <span class="kw">Audio Branch（聲音去噪）</span>——兩條平行線，但共用同一個去噪排程。論文稱之為「原生音視頻聯合生成（Native Audio-Visual Joint Generation）」。</p>
+
+<h4>第一步：兩個分支，一個時鐘</h4>
+<pre><code>Step t = 999:  [Visual: 全是雜訊]        [Audio: 全是雜訊]
+                        ↕  Cross-Modal Joint Module
+Step t = 998:  [Visual: 浮現輪廓]          [Audio: 浮現背景音]
+                        ↕
+...
+Step t = 0:    [Visual: 乾淨畫面]          [Audio: 對白+音效+BGM，三軌獨立]</code></pre>
+<p>關鍵是：兩個分支的 t 永遠同步。每一步去噪，視覺 latent 和音訊 latent 都透過 <span class="kw">Cross-Modal Joint Module（跨模態聯合模組）</span>交換當前的狀態。不是「先生成畫再生成音」，是「每一步畫和音一起進化」。</p>
+
+<h4>第二步：雙向資訊流——音告訴畫嘴巴怎麼動，畫告訴音哪裡有碰撞</h4>
+<ul>
+<li><strong>音 → 畫</strong>：音訊分支把語音的<span class="kw">音素時間點（phoneme timing）</span>——哪個音在什麼時候發出——傳給畫面分支。/p/ 音（雙唇爆破）→ 對應幀嘴唇區域 latent 調整：雙唇閉合、爆破張開。Seedance 1.5 Pro 論文揭露了雙分支架構，但 phoneme 級別的同步細節未在論文中展開。產品文檔（seedance.tv）實測數據：乾淨錄音唇形延遲 40–80ms，嘈雜錄音 120–200ms。社群最佳實踐：10s 內 ≤12 詞，句子間加停頓標記作重同步錨點</li>
+<li><strong>畫 → 音</strong>：畫面分支在產生碰撞（杯子落地、腳步著地）時，在對應幀的 latent 中留下特徵變化。Joint Module 把事件訊號傳給音訊分支，觸發 Foley 音效。重點：不是從音效庫選一個播放——是根據碰撞強度、材質、空間距離<strong>從零合成</strong>。「靴子踩濕鵝卵石」和「球鞋踩硬木地板」產出完全不同的腳步聲</li>
+</ul>
+
+<h4>Prompt 中的對白文字怎麼變成語音？</h4>
+<p>到這裡，你可能注意到一個缺口：雙分支架構解釋了音和畫怎麼同步，但「對白文字本身怎麼變成聲音」——Seedance 論文<strong>沒有描述</strong>。以下是基於產品行為和學術界相近研究的推論。</p>
+
+<h4>產品行為：雙引號 = 觸發 TTS</h4>
+<p>從社群實測和平台文檔（seedance.tv、opusly.ai、replicate、fal.ai）可以確認：Seedance 2.0 把 prompt 中雙引號 <code>"..."</code> 內的文字標記為<span class="kw"> spoken dialogue</span>，路由到 Audio Branch 生成對應語音。雙引號外的文字則作為場景描述，路由到 Video Branch。角色的<span class="kw">聲線（音色、年齡、性別、口音）</span>由 prompt 中的角色描述推斷——例如「画家莫奈」→ 年長男性、沉穩語調。上傳的音訊檔案（@Audio1）是<span class="kw">節奏和語調的參考</span>，不是語音克隆來源。</p>
+
+<h4>學術界相近做法（非 Seedance 官方）</h4>
+<p>目前最接近的學術論文是 <a class="paper" href="https://arxiv.org/abs/2504.02433">OmniTalker（Wang et al., NeurIPS 2025）</a>——同樣採用 dual-branch DiT 架構，從文字同時生成語音和說話人臉。其 Audio Branch 的內部流程為：<span class="kw">text encoder → duration predictor（預測每個音素的持續時間）→ mel-spectrogram diffusion（去噪生成頻譜）→ vocoder（頻譜轉波形）</span>。淺層 DiT block 中的 cross-modal fusion 確保 phoneme 級別的唇形同步。<a class="paper" href="https://arxiv.org/abs/2604.23586">Talker-T2AV（2026）</a> 則指出 pervasive cross-modal attention 對 talking head 是次優的——語音和臉部在高層語意上相關，但低層信號（波形 vs. 像素紋理）的生成路徑應該分開。Seedance 2.0 實際採用哪種策略，官方未揭露。</p>
+
+<div class="warn-box"><strong>⚠️ 誠實揭露</strong><br>
+以上 TTS 內部流程的描述來自 OmniTalker（阿里巴巴）論文，非 Seedance 官方。Seedance 1.5 Pro 和 2.0 Model Card 均未描述 Audio Branch 內部的 TTS 實現細節。聲線推斷的行為來自社群實測和平台文檔。</div>
+
+<h4>第三步：音訊分支內部——三條獨立音軌 + 空間定位</h4>
+<p>音訊分支不是生出一條混合音軌。它在潛在空間中平行解算三條獨立軌道：</p>
+<ul>
+<li><strong>對白/配音</strong>：和畫面分支唇形特徵雙向對齊</li>
+<li><strong>環境音（Ambience）</strong>：根據畫面場景自動生成——雨景有雨聲、森林有鳥鳴</li>
+<li><strong>背景音樂（BGM）</strong>：根據 Prompt 情緒和場景風格生成</li>
+</ul>
+<p>最後透過<span class="kw">雙耳立體聲編碼（Binaural Audio Encoding）</span>，結合畫面 3D 空間資訊（角色距離、左右位置），自動計算 <span class="kw">ITD（雙耳時間差）</span>和 <span class="kw">ILD（雙耳聲級差）</span>——你戴耳機聽，聲音有方向感。</p>
+
+<div class="highlight-box"><strong>🎬 作為導演，這代表什麼</strong>
+<ul style="margin-bottom:0">
+<li><strong>ComfyUI 無法重現原生雙分支去噪</strong>——這是訓練階段嵌入權重的機制，推理端只能走級聯（靜音影片 → 外掛 MMAudio/AudioLDM），同步精度有落差</li>
+<li>對白場景控制在 10 秒內、12–20 個詞；句子間加停頓標記作為重同步錨點</li>
+<li>多人對白和複雜音效疊加仍是開放問題——論文也承認</li>
+</ul></div>
+
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2512.13507">Seedance 1.5 Pro §3–4</a> — 雙分支 DiT、Cross-Modal Joint Module 原始設計。<br>
+<a class="paper" href="https://arxiv.org/abs/2604.14148">Seedance 2.0 Model Card §1–2</a> — 雙耳音訊、多軌輸出（對白/環境音/BGM）、音畫同步評測。<br>
+<a class="paper" href="https://arxiv.org/abs/2504.02433">OmniTalker (NeurIPS 2025)</a> — dual-branch DiT 做 text→speech+talking face 的學術參考（非 Seedance）。<br>
+<a class="paper" href="https://arxiv.org/abs/2604.23586">Talker-T2AV (2026)</a> — 指出 pervasive cross-modal attention 對 talking head 為次優。
+</div></div></details>
+
+
+<details id="q10"><summary>Q10: 圖片、影片、文字、音訊——四種完全不同的格式。Seedance 2.0 怎麼把它們融合在一起？</summary><div class="answer">
+
+<h4>一句話：統一架構內一起算，不拆開分頭處理再拼裝。</h4>
+
+<h4>論文說了什麼</h4>
+<p>Seedance 2.0 Model Card 描述的是<span class="kw">統一多模態聯合生成架構</span>——文字、圖片、影片、音訊四種輸入，在同一個 DiT 去噪過程中同時處理。不是「先生成畫面再配音」的級聯，而是一次性聯合生成（<a class="paper" href="https://arxiv.org/abs/2604.14148">Seedance 2.0 Model Card §1</a>）。目前開放平台支援最多 <strong>3 段影片、9 張圖片、3 段音訊</strong>作為參考輸入。</p>
+<p>論文描述的輸入上限和輸出規格是確定的。但底層架構細節——具體怎麼編碼、怎麼對齊不同模態的 embedding——Model Card 沒有揭露。</p>
+
+<div class="warn-box"><strong>⚠️ 誠實揭露</strong><br>
+Seedance 2.0 論文是 Model Card（產品說明），不是技術論文。以下「從使用中觀察到的行為」來自社群實測和實務經驗，不是論文內容。內部架構（VAE 細節、Attention 變體、多模態對齊方式）為團隊未公開資訊。</div>
+
+<h4>從使用中觀察到的行為</h4>
+<p>雖然論文沒說，但從實際使用可以觀察到：</p>
+<ul>
+<li><strong>@image1 的人物照</strong>：模型能持續參考角色面部特徵，跨多秒不變臉。推測是 Cross-Attention 在每一步去噪都回頭查閱參考圖的 Key/Value 特徵。</li>
+<li><strong>@video1 的運鏡</strong>：模型提取鏡頭運動路徑和節奏，套用到新生成的畫面。</li>
+<li><strong>多素材共存</strong>：同時給 @image1（角色）和 @image2（衣服），模型能分開引用不同來源。素材之間色系差異越大，隔離越好（紅+藍 > 紅+橘）。</li>
+<li><strong>素材上限</strong>：兩個角色是甜蜜點，三個以上 Identity 開始漂移。</li>
+</ul>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+參考圖用純色背景乾淨特寫——背景雜亂會被當成 Identity 特徵一起編碼。<br>
+同一張原始參考圖貫穿全場景，不要用前一場截圖當下一場參考（累積光源和色調偏差）。<br>
+多素材融合是 Seedance 2.0 最大優勢——Kling、Veo、Runway 的多模態處理要嘛級聯、要嘛只支援少數組合。<br>
+Prompt 中的對白文字如何變成語音+唇形，詳見 <a href="#q9">Q9</a>。</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2604.14148">Seedance 2.0 Model Card §1–2</a> — 統一多模態架構、輸入上限、音畫評測。<br>
+<a class="paper" href="https://arxiv.org/abs/2512.13507">Seedance 1.5 Pro §3</a> — Cross-Modal Joint Module（2.0 的前身架構，細節可能有調整）。<br>
+<a class="paper" href="https://arxiv.org/abs/2504.16081">Survey of Video Diffusion Models (TMLR 2025, §5)</a> — 多模態生成綜述。
+</div></div></details>
+
+<details id="q11"><summary>Q11: @image1、@video1 這些標籤怎麼運作？為什麼比純文字 Prompt 精準？</summary><div class="answer">
+
+<h4>一句話：@ 標籤不是文字替換，是一個 embedding slot，直接把視覺特徵灌進 Cross-Attention</h4>
+<p>純文字 Prompt「一個穿紅衣服的女人」要走兩步：文字 → CLIP text encoder → 語意向量 → Cross-Attention 映射視覺。每一步都有資訊損耗。@ 標籤跳過這個轉譯過程——直接把參考圖的視覺特徵當作 token 餵進去。</p>
+
+<h4>底層怎麼運作？</h4>
+<p>當 Prompt 出現 <code>@image1</code>，模型在注意力機制中分配一個<span class="kw">模態位置編碼（Modality-Specific Position Embedding）</span>——一個實際的 embedding slot，模型在訓練中學會了「這個位置的 token 對應到視覺參考編碼器的輸出」。然後 Cross-Attention 把生成畫面的 Query 精確路由到這張參考圖的 Key/Value 矩陣：</p>
+<pre><code>生成畫面 patches 的 Query ──→ @image1 的 K/V（角色面部特徵）
+                           ──→ @image2 的 K/V（服裝質感特徵）
+                           ──→ @video1 的 K/V（運鏡軌跡特徵）</code></pre>
+<p>這讓複合指令變得可行：<code>"@image1 的角色穿著 @image2 的衣服，按 @video1 的運鏡方式走動"</code>——三個參考來源同時查詢，<a href="#q10">Q10</a> 的 Dynamic Weight Masking 負責隔離。</p>
+
+<div class="highlight-box"><strong>🎬 作為導演，這代表什麼</strong>
+<ul style="margin-bottom:0">
+<li>@ 標籤像導演直接給演員看照片，而非口頭描述長相——跳過文字轉譯，訊號更直接</li>
+<li>參考圖要乾淨（純色背景）——背景凌亂 = Identity Embedding 混進雜訊，跟著 @ 標籤一起注入畫面</li>
+<li>多素材時風格和顏色差距越大越好——紅+藍容易隔離，紅+橘 mask 很吃力</li>
+<li>複合指令明確指定哪個 @ 做什麼，不要讓模型自己猜</li>
+</ul></div>
+
+<div class="cite-block"><strong>📖 引用論文</strong>
+@ 標籤底層機制為社群從產品行為推論，Seedance 2.0 Model Card 未描述內部實作。<br>
+<a class="paper" href="https://arxiv.org/abs/2507.16869">Controllable Video Survey (Ma et al., §4.2)</a> — 控制信號注入 DiT 的綜述。
+</div></div></details>
+
+
+<details id="q12"><summary>Q12: Seedance 2.0 的「導演級運鏡」和「物理理解」是訓練出來的嗎？它真的懂物理嗎？</summary><div class="answer">
+
+<h4>三階段訓練</h4>
+<ol>
+<li><span class="kw">超大規模預訓練（Pre-training）</span>：數億組音影片對的自監督學習。模型在這個階段建立對重力、光線、流體、碰撞的基礎模式識別——不是理解物理定律，而是「看過夠多次蘋果往下掉，所以知道蘋果不該往上飄」</li>
+<li><span class="kw">高質量 SFT（Supervised Fine-Tuning）</span>：專業影視團隊標註的數據——精細分鏡腳本、運鏡術語（Push/Pull/Tracking Shot）、光影氛圍、高品質雙耳音訊。這是「導演級運鏡」的主要來源</li>
+<li><span class="kw">RLHF + 多維度獎勵模型</span>：三個平行的 reward model——Physics Reward（懲罰穿模、反重力）、Sync Reward/SyncDPO（唇形對齊）、Aesthetics Reward（構圖、色彩、鏡頭語言）</li>
+</ol>
+
+<h4>誠實答案：它表現最好，但距離「真正懂物理」還很遠</h4>
+<p><a class="paper" href="https://arxiv.org/abs/2605.07061">AV-Phys Bench (Tian et al., arXiv:2605.07061, §4)</a> 評測了 7 個模型。Seedance 2.0 綜合得分最高——例如正確處理了鐘聲與鐘擺的音畫因果。但所有模型在複雜物理場景（多物體互動、流體、碰撞）中仍頻繁出現幻覺。</p>
+<p>關鍵洞察：Physics Reward 只讓模型學會「輸出看起來符合物理的畫面」——和「理解物理」是兩回事。模型不知道 F=ma，它只知道「這種畫面排列在訓練資料中常出現」。</p>
+
+<div class="highlight-box"><strong>🎬 作為導演，這代表什麼</strong><br>
+簡單物理場景（走路、放杯子）可以信任。複雜場景（打鬥、液體、精細操控）不要全交給模型——用 ControlNet 注入深度/姿態先驗。<br>
+「模型懂物理」是危險的幻覺——它模擬物理的外觀，不是做物理模擬。</div>
+
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2512.13507">Seedance 1.5 Pro §3–4</a> — 三階段訓練（Pre-training → SFT → RLHF）與多維度獎勵模型。<br>
+<a class="paper" href="https://arxiv.org/abs/2305.18290">DPO (Rafailov et al., NeurIPS 2023, §3)</a> — VideoDPO/SyncDPO 理論基礎。<br>
+<a class="paper" href="https://arxiv.org/abs/2605.07061">AV-Phys Bench (Tian et al., §4)</a> — 物理理解評測。
+</div></div></details>
+
+<details id="q13"><summary>Q13: 為什麼 Seedance 2.0 最長只能生 15 秒？拉到 30 秒難在哪？</summary><div class="answer">
+<p>瓶頸出在 Self-Attention 的 <span class="kw">O(n²) 運算複雜度</span>。token 數量越多，運算量平方成長。<strong>長度變 2 倍 → 計算量變 4 倍</strong>。</p>
+
+<p>論文直接佐證：Wan2.1 1.3B 中 self-attention 佔 transformer block 總運算的 <strong>76%</strong>（<a class="paper" href="https://arxiv.org/abs/2509.24899">Attention Surgery, arXiv:2509.24899, §1</a>）。Mochi-1 10B 中佔約 <strong>60%</strong>（<a class="paper" href="https://arxiv.org/abs/2504.10317">Analysis of Attention in VDiTs, arXiv:2504.10317, §1</a>）。</p>
+<p>粗估 token 量級（未在論文中，僅供參考）：5 秒 720p ≈ 10 萬 token，15 秒 ≈ 30–45 萬，30 秒 ≈ 60–90 萬。</p>
+
+<h4>Seedance 2.0：上限 15 秒，以上靠拼接</h4>
+<p>Seedance 2.0 Model Card 原生支援 4–15 秒。超過 15 秒靠社群 workaround——生成多段短片段再接起來，但接縫處角色漂移、光線不一致、動作不連續。論文本身未對此提供解決方案。</p>
+
+<h4>Seedance 2.5：Sparse Attention 突破 30 秒</h4>
+<p>2026 年 6 月發表的 Seedance 2.5 原生生成 30 秒 4K 影片，不靠拼接。技術方向是<span class="kw">稀疏注意力（Sparse Attention）</span>——不讓每個 token 跟所有 token 互動，只跟有意義的鄰居互動，複雜度從 O(n²) 壓到接近 O(n log n)。學術上稀疏 attention 有多個方向——VMonarch（CVPR 2026）、FreqFormer（arXiv:2604.22808）——Seedance 2.5 是第一個在產品級模型上實現的。（註：2.5 尚未發布技術論文，產品頁面未揭露內部架構細節。）</p>
+
+<div class="highlight-box"><strong>🎬 作為導演，這代表什麼</strong><br>
+15 秒和 30 秒不是同一個量級的任務。Seedance 2.0 拍片，每個鏡頭控制在 8–12 秒內品質最穩定。<br>
+超過 15 秒 → 要嘛接受拼接的品質損失，要嘛等 2.5。<br>
+生成時間成本不是線性的——10 秒可能 2 分鐘、15 秒 5 分鐘、20 秒可能爆 VRAM。排拍攝時程要把非線性算進去。</div>
+
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2509.24899">Attention Surgery (arXiv:2509.24899, §1)</a> — Wan2.1 中 self-attention 佔 76% 運算。<br>
+<a class="paper" href="https://arxiv.org/abs/2504.10317">Analysis of Attention in VDiTs (arXiv:2504.10317, §1)</a> — Mochi-1 中佔 60%。<br>
+<a class="paper" href="https://arxiv.org/abs/2604.15911">Efficient Video Diffusion Survey (Shao et al., §3)</a> — 稀疏 attention、量化、快取的系統性綜述。
+</div></div></details>
+
+
+<details id="q14"><summary>Q14: 我沒寫任何運鏡術語（dolly、pan、tracking shot），為什麼 Seedance 輸出的影片有鏡頭在動？這運鏡是 Self-Attention 自己決定的嗎？</summary><div class="answer">
+
+<h4>一句話：運鏡不是 Self-Attention「決定」的——是預訓練視覺先驗 + Temporal Attention 平滑 + RLHF 美學獎勵 + 參考影片運動提取，四層機制疊加的結果。</h4>
+
+<h4>先確認現象</h4>
+<p>Seedance 1.5 Pro 論文 abstract 提到「dynamic cinematic camera control」，Q12 說明了 SFT 階段用專業影視數據訓練——但這些描述的是<span class="kw"> explicit control</span>（模型能理解並執行你指定的運鏡術語），不是 emergent behavior（你沒指定，它自己產生的運鏡）。後者才是我們要討論的。</p>
+
+<h4>來源一：預訓練的視覺先驗（最主要）</h4>
+<p>Seedance 1.5 Pro §3–4 描述的三階段訓練中，預訓練階段使用了<span class="kw">數億組音影片</span>。這些影片絕大多數不是靜止鏡頭——它們有 subtle push-in、輕微 handheld、緩慢 pan。完全靜止的幀序列在訓練數據中極少出現。</p>
+<p>模型學到的不是「這個場景該用 dolly in」這種 explicit rule，而是<span class="kw">「畫面不該完全靜止」的統計分佈先驗</span>。生成時，這個先驗表現為：token 序列自然帶有運動趨勢。同時，SFT 階段的專業影視數據進一步內化了「cinematic = 有運鏡」的美學偏好——即使 prompt 沒寫運鏡。</p>
+
+<h4>來源二：Temporal Attention 的幀間平滑</h4>
+<p>影片 DiT 的 Temporal Attention（<a href="#q4">Q4</a>、<a href="#q6">Q6</a>）在相鄰幀的 token 之間建立關聯。它學到的不是「這裡該做 pan」，而是<span class="kw">「相鄰幀的全局位移應該平滑連續」</span>——這本質上就是運鏡的數學形式。<a class="paper" href="https://arxiv.org/abs/2504.16081">Survey of Video Diffusion Models（TMLR 2025, §3.3）</a>描述了 Temporal Attention 如何在時間軸上維持一致性。推論：Temporal Attention 的平滑約束在全局層面自然表現為鏡頭運動。</p>
+
+<h4>來源三：RLHF 美學獎勵</h4>
+<p>Seedance 1.5 Pro §4 描述了多維度獎勵模型，其中<span class="kw"> Aesthetics Reward</span> 的評分維度包含「構圖、色彩、<strong>鏡頭語言</strong>」。RLHF 訓練過程中，有 subtle camera movement 的輸出獲得的獎勵分數 > 完全靜止的輸出。這不是 prompt 要求的——是 reward model 訓練出來的偏好，在推理時自動生效。</p>
+
+<h4>來源四：參考影片的運動提取</h4>
+<p>如果你上傳了參考影片（如 <code>@video1</code>），Seedance 會透過 <a href="#q11">Q11</a> 的 @video 機制提取影片中的 motion pattern——包括鏡頭運動——並套用到生成畫面。但如果你沒有上傳參考影片，這層就不適用。</p>
+
+<h4>小結</h4>
+<p><span class="kw">Self-Attention 和 Temporal Attention 是實現機制（how）</span>——它們提供了 token 之間交換資訊和維持時間一致性的能力。<span class="kw">但運鏡的方向、速度、節奏來自訓練數據的分佈（what）</span>——模型不是「決定要做 dolly in」，而是它生成的 token 序列在統計上不可能完全靜止。</p>
+
+<div class="highlight-box"><strong>🎬 導演</strong><br>
+如果你不想要模型自己加的運鏡，prompt 中明確指定「static shot, locked-off camera, no camera movement」。nemovideo.com 的結論：「No camera line = the model decides. Sometimes it gets lucky. Most of the time, it doesn't.」</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2512.13507">Seedance 1.5 Pro §3–4</a> — 三階段訓練與多維度獎勵模型。<br>
+<a class="paper" href="https://arxiv.org/abs/2504.16081">Survey of Video Diffusion Models (TMLR 2025, §3.3)</a> — Temporal Attention 的時間軸一致性。
+</div></div></details>
+
+
+<details id="q15"><summary>Q15: 「無奈的笑」「笑容僵住面色凝重」——Seedance 是怎麼理解這些情緒描述的？它有心智模型嗎？</summary><div class="answer">
+
+<h4>一句話：Seedance 沒有情緒理解模組——Text Encoder 把「無奈的笑」編成一個同時包含情緒和臉部動作的語意向量，Cross-Attention 在去噪中把它映射為對應的臉部 blendshape 組合。</h4>
+
+<h4>論文說了什麼</h4>
+<p>兩篇 Seedance 論文<span class="kw">均未描述情緒理解機制</span>。Model Card 和 1.5 Pro 技術報告都沒有提到 emotion recognition module、facial expression model、或任何情緒相關的架構組件。</p>
+
+<h4>產品行為</h4>
+<p>從 seedanceai.cc 的能力描述和社群實測可以確認：Seedance 2.0 的「角色面部微表情（眼部運動、嘴形、眉毛位置）和肢體語言（手勢、姿勢、動作強度）會回應 prompt 中描述的情緒脈絡」。而且具體的物理描述優於抽象情緒標籤——"'Gentle smile with a slight head tilt' produces more nuanced results than just 'happy'。"</p>
+
+<h4>推論機制</h4>
+<p>底層機制推測如下：</p>
+<pre><code>Prompt 中的「無奈的笑」
+        ↓
+Text Encoder（CLIP / T5-XXL）
+        ↓
+語意向量：同時捕捉「無奈」（情緒valence） + 「笑」（臉部動作配置）
+        ↓
+Cross-Attention 注入 Video Branch 的面部區域 latent tokens
+        ↓
+去噪過程中，面部 latent 被條件化為特定 blendshape 組合：
+嘴角微揚（笑），但眉頭微蹙、眼神缺乏笑意（無奈）</code></pre>
+<p>這不是離散的情緒分類器（happy=0.8, sad=0.2），而是<span class="kw">連續的語意映射</span>。Text Encoder 在訓練中學到了「無奈的笑」對應的臉部肌肉配置——因為訓練數據中有大量標註了情緒描述的影片。</p>
+<p>「<strong>笑容僵住面色凝重</strong>」這類情緒過渡則是透過 <span class="kw">Temporal Attention</span> 在兩幀之間平滑 expression shift 來實現的。</p>
+
+<h4>社群實證：FACS 精確控制</h4>
+<p>Reddit r/generativeAI 社群有人用 <span class="kw">FACS（Facial Action Coding System）</span>圖表作為參考圖上傳到 Seedance 2.0，在 prompt 中指定 AU（Action Unit）編碼來精確控制特定臉部肌肉的動作——驗證了模型透過 reference image 可以實現比文字描述更精細的表情控制。</p>
+
+<div class="warn-box"><strong>⚠️ 誠實揭露</strong><br>
+以上機制描述為基於 DiT 架構（Text Encoder + Cross-Attention）和產品行為的推論。Seedance 論文未描述情緒理解的內部實現。</div>
+<div class="cite-block"><strong>📖 引用論文</strong>
+<a class="paper" href="https://arxiv.org/abs/2212.09748">DiT (ICCV 2023, §3.1)</a> — Cross-Attention 條件化機制。<br>
+<a class="paper" href="https://arxiv.org/abs/2112.10752">LDM (CVPR 2022, §4.2)</a> — CLIP Text Encoder 的語意映射。
+</div></div></details>
+
+
+<details id="q16"><summary>Q16: 我丟了一張九宮格 storyboard 給 Seedance——上面有圖、有字、有箭頭。它真的看得懂嗎？為什麼會照著分鏡表做場景切換？</summary><div class="answer">
+
+<h4>一句話：Seedance 2.0 內部有鏡頭分解（Shot Decomposition）步驟——不是把 storyboard 當「一張圖」，而是先解析 panel 序列、讀取文字標註，再從 panel 之間的空間差異自動推斷運鏡和過渡。</h4>
+
+<h4>官方證據</h4>
+<p>ByteDance 官方 launch 頁面（seed.bytedance.com）明確寫著：<span class="kw">"It can even directly reference text-based storyboards"</span>。官方 prompt 範例進一步列出具體提取的內容：「Refer to the shooting script in @Image 1, and draw on the storyboard, <span class="kw">shot scale, camera movement, visuals and copy</span> in @Image 1」——"copy" 就是 storyboard 上的文字標註。</p>
+
+<h4>推論機制：四步驟</h4>
+<p><strong>Step 1 — 影像理解層解析 storyboard</strong>：分離每個 panel 的視覺特徵（構圖、角色位置、色調、光影）+ OCR/VLM 讀取 panel 上的文字標註（鏡位如 CU/WS、運鏡方向如 push-in/pan、時間點）+ 建立 panel 之間的空間關係與序列順序。</p>
+<p><strong>Step 2 — 鏡頭分解（Shot Decomposition）</strong>：nemovideo.com 的 prompt 指南揭露了一個關鍵行為：「Seedance 2.0 doesn't process your prompt as one big block of text. <span class="kw">It reads your prompt and breaks it down into a sequence of distinct camera shots</span>——acting like a storyboard artist before generating a single frame。」每個 panel 對應一個 shot。</p>
+<p><strong>Step 3 — 與 Prompt 文字融合</strong>：Prompt 中的時序描述（0-1 秒、1 秒開始）映射到對應 panel。沒有 prompt 文字時，模型從 panel 佈局自行推斷過渡方式和節奏。</p>
+<p><strong>Step 4 — DiT 去噪生成</strong>：Cross-Attention 在每個 shot 段查閱對應 panel 的 K/V，Temporal Attention 平滑 shot 之間的過渡。</p>
+
+<h4>為什麼只給 storyboard 就會產生運鏡變換？</h4>
+<p>Panel 1 是 wide shot、panel 2 是 close-up——要從 panel 1 走到 panel 2，<span class="kw">中間唯一的連續路徑就是 push-in</span>。模型不是「被指定」做 push-in，而是 panel A 到 panel B 的空間差異本身就是 conditioning signal——運鏡是被推斷的，不是被指定的。nemovideo 的結論：「No camera line = the model decides. Sometimes it gets lucky. Most of the time, it doesn't.」</p>
+
+<h4>Storyboard vs. 純視覺風格參考（mood board）</h4>
+<div class="tbl-wrap"><table>
+<tr><th></th><th>純視覺風格參考（單張 mood board）</th><th>Storyboard（多格分鏡）</th></tr>
+<tr><td>模型看到的</td><td>一張圖的全局特徵</td><td>多格 panel 序列 + 文字標註</td></tr>
+<tr><td>提取的資訊</td><td>色調、光影、角色外觀</td><td>鏡位、運鏡方向、場景順序、copy 文字</td></tr>
+<tr><td>運鏡來源</td><td>預訓練先驗（<a href="#q14">Q14</a>）</td><td>panel 間空間差異 → explicit conditioning</td></tr>
+<tr><td>可控性</td><td>低（模型自行決定）</td><td>中高（panel 提供 explicit shot plan）</td></tr>
+</table></div>
+
+<div class="warn-box"><strong>⚠️ 誠實揭露</strong><br>
+Shot Decomposition 的內部步驟為基於 nemovideo.com 社群分析和產品行為的推論。Seedance 論文未描述 storyboard 的內部解析機制。</div>
+<div class="cite-block"><strong>📖</strong>
+Seedance 2.0 Official Launch (seed.bytedance.com) — text-based storyboard 支援。<br>
+nemovideo.com prompt 指南 — Shot Decomposition 行為描述。
+</div></div></details>
+
+
+<details id="q17"><summary>Q17: Storyboard 實戰技巧——放幾格最好？用示意圖還是完整渲染圖？文字標註會不會滲入輸出？</summary><div class="answer">
+
+<h4>一句話：六個關鍵決策——面板數、角色分離、示意圖 vs 渲染、文字滲入防範、用途宣告、前置修復。</h4>
+
+<h4>放幾格最好？塞 12 格會不會讓注意力分散？</h4>
+<p><strong>≤4 panel（2×2 網格）是甜蜜點。</strong> ByteDance 官方（morphic.com 引述）明確警告：「With too many references, the model struggles to judge which features take priority, and you get <span class="kw">style conflicts, blurry subject identification</span>, and output that drifts from what you asked for。」注意力是有限資源——panel 越多，每個 panel 分到的 Cross-Attention 權重越低。12 格的 storyboard 在 oimi.ai 案例中可行，但前提是每個 panel 只有一個主體/一個動作，且 prompt 非常精確。</p>
+
+<h4>Storyboard 裡也有角色——它會不會跟我的角色參考圖打架？</h4>
+<p><strong>會。這是 identity drift 的常見來源。</strong> morphic.com 確認：「Seedance 2.0 frequently reads a multi-view sheet as <span class="kw">several different people</span>。」如果 storyboard 中同一角色在不同 panel 畫得稍有不同，模型可能把它當成多個不同的人。解法：<span class="kw">分離角色參考圖和 storyboard</span>——@Image1 用純色背景的正面特寫鎖定 Identity，@Image2 用 storyboard 控制構圖和運鏡。prompt 中明確分工。</p>
+
+<h4>該用示意圖（鉛筆草稿）還是完整渲染圖？</h4>
+<p><strong>兩者都可行，但鐵律是「所有 reference 保持相同視覺 register」</strong>——不要混合照片和插畫（seedance2.so）。Sketch 風格的成功案例：oimi.ai 用 rough graphite storyboard sketch style + 12 panels，Seedance 2.0 一次生成成功。示意圖的優勢：模型理解為 pre-vis，不會污染角色外觀。風險：sketch 風格（鉛筆線條、單色調）可能滲入輸出。</p>
+
+<h4>Storyboard 上面的文字標註會不會跑到輸出影片裡？</h4>
+<p><strong>會。這是已知 bug。</strong> OpenArt 的 Seedance 2.0 Handbook 明確警告：storyboard 上的文字標註（"CU"、"push-in"、"0-3s"）可能<span class="kw"> bleed 進輸出畫面</span>。解法：在 prompt 中加 <code>"no text overlay on screen"</code>。</p>
+
+<h4>Prompt 裡要怎麼寫，模型才知道哪張是 storyboard、哪張是角色臉？</h4>
+<p><strong>明確指定每個 reference 的用途。</strong> 模型不會自動判斷哪張圖該做什麼（seedance2.so）。範例 prompt：<code>"@Image1 as storyboard reference for shot composition and camera movement. @Image2 as character face reference——use only for facial features and expression, not the background or lighting."</code></p>
+
+<h4>Storyboard 丟進去之前，有什麼前置作業？</h4>
+<p>Reddit r/generativeAI 社群的最佳實踐：inpaint 多餘物體、修復臉部和手部、移除雜亂背景元素；upscale 到足夠解析度；確認所有 panel 的光線和風格一致。</p>
+
+<div class="cite-block"><strong>📖</strong>
+morphic.com Seedance 2.0 指南 — reference 數量警告。<br>
+seedance2.so reference 指南 — 視覺 register 一致性。<br>
+oimi.ai GPT Image 2 + Seedance 2.0 案例 — sketch storyboard 成功實例。<br>
+OpenArt Seedance 2.0 Handbook — 文字滲入 bug。
+</div></div></details>
+
+
+<details id="q18"><summary>Q18: 我用中文寫 prompt 跟用英文寫，Seedance 的理解有差嗎？為什麼？</summary><div class="answer">
+
+<h4>一句話：兩篇 Seedance 論文沒提語言特性——但訓練數據以中文影片為主，中文 prompt 的場景覆蓋率更高；英文攝影術語也完全可用。</h4>
+
+<h4>論文面</h4>
+<p>Seedance 1.5 Pro 和 2.0 Model Card <span class="kw">均未描述 text encoder 的語言特性</span>。沒有提及支援哪些語言、用什麼 encoder、或中英文的處理差異。</p>
+
+<h4>產品面</h4>
+<p>Seedance 2.0 原生平台是<span class="kw">即夢（Jimeng）</span>，中國市場為主，中文 prompt 是原生用法。國際版（seedance.ai）支援英文，攝影術語（dolly, pan, tracking shot, shallow depth of field）理解良好。Prompt 字元上限 2000，以 <code>len()</code> 計算——中文每字 = 1 字元，英文 prompt 更容易碰到上限。</p>
+
+<h4>為什麼中文可能更精準？</h4>
+<p>訓練數據以中國影片為主（抖音、西瓜視頻），中文描述的<span class="kw">場景覆蓋率更高</span>——中文 prompt 能觸及的 training data manifold 更密集。文化特定概念（古風、武俠、江湖、國潮）用中文 prompt 遠優於英文翻譯——這些概念的語意很難完整對譯。</p>
+
+<h4>英文也完全可用</h4>
+<p>英文攝影術語理解良好。國際版就是以英文為預設界面。GitHub 上的 Seedance prompt 技能庫（Emily2040/seedance-2.0）同時提供中英日韓四語支援。</p>
+
+<h4>推論：text encoder 架構</h4>
+<p>字節跳動其他模型（如 Seedream）的實踐暗示，Seedance 2.0 的 text encoder 很可能是<span class="kw">中英雙語聯合訓練</span>——不是「先翻譯成英文再編碼」，而是兩種語言的語意在相同 embedding space 中有對應關係。但這是推論，官方未確認。</p>
+
+<div class="warn-box"><strong>⚠️ 誠實揭露</strong><br>
+以上關於 text encoder 語言特性和訓練數據分佈的分析為基於產品行為和社群共識的推論。Seedance 論文未提供相關資訊。</div>
+<div class="cite-block"><strong>📖</strong>
+GitHub Emily2040/seedance-2.0 — 多語 prompt 技能庫。<br>
+GitHub songguoxs/seedance-prompt-skill — 中文 prompt 工程指南。<br>
+Reddit r/generativeAI — Seedance 2.0 非英語語言表現討論。
+</div></div></details>
+
+
+<!-- ===== PART 3: DIAGNOSIS ===== -->
+<h2 class="section-header">三、出問題了——為什麼？怎麼辦？</h2>
+
+<details id="q19"><summary>Q19: 角色跨鏡頭變臉</summary><div class="answer">
+
+<h4>🔍 根因</h4>
+<p><a href="#q10">Q10</a> 的 Reference Cross-Attention 隨序列長度衰減——到了第 500 步，Query 和 Identity Embedding 的累積偏差沒有機制拉回來。解析度/長寬比變動觸發 patch 網格重算，Attention 空間參考點全部移位（Reddit r/aivideos）。</p>
+
+<h4>🛠️ 解法</h4>
+<ul>
+<li><strong>ComfyUI</strong>：IP-Adapter FaceID Plus V2，weight <strong>0.8–0.9</strong>。疊加 FaceDetailer，denoise <strong>0.2–0.35</strong>。同一張原始參考圖貫穿全場景——不要用前一場截圖（<a href="#q10">Q10</a>）。鎖定解析度和長寬比</li>
+<li><strong>Seedance</strong>：<code>@image1</code> 純色背景正面特寫。Prompt 角色描述模板鎖定不變，只改動作和場景</li>
+</ul>
+
+<div class="cite-block"><strong>📖</strong> <a class="paper" href="https://arxiv.org/abs/2308.06721">IP-Adapter §4</a> · <a class="paper" href="https://arxiv.org/abs/2404.16022">PuLID §3–4</a> · <a class="paper" href="https://arxiv.org/abs/2604.14148">Seedance 2.0 Model Card</a></div>
+</div></details>
+
+<details id="q20"><summary>Q20: 肢體融化、多手多腳</summary><div class="answer">
+
+<h4>🔍 根因</h4>
+<p>高 CFG → SNR 崩潰（<a href="#q5">Q5</a>），去噪後段把肢體結構當雜訊砍了。缺乏幾何約束（<a href="#q1">Q1</a>），去噪前段姿態框架沒建立好（<a href="#q6">Q6</a>），後段在錯誤框架上補細節。</p>
+
+<h4>🛠️ 解法</h4>
+<ul>
+<li><strong>ComfyUI</strong>：DWPose Full Body + Depth Anything V2 雙 ControlNet，strength <strong>0.5–0.6</strong>，start=0.0, end=<strong>0.7</strong>。CFG ≤ <strong>7</strong>。RescaleCFG = <strong>0.6</strong></li>
+<li><strong>Seedance</strong>：<code>@video1</code> 真人動作參考。避免極端肢體描述。<strong>禁用否定句</strong>——Seedance 2.0 無 negative prompt 欄位（seedanceai.cc）</li>
+</ul>
+
+<div class="cite-block"><strong>📖</strong> <a class="paper" href="https://arxiv.org/abs/2302.05543">ControlNet (ICCV 2023, §3.1–3.3)</a> · <a class="paper" href="https://arxiv.org/abs/2305.08891">RescaleCFG (WACV 2024, §3–4)</a></div>
+</div></details>
+
+<details id="q21"><summary>Q21: 口型對不上語音</summary><div class="answer">
+
+<h4>🔍 根因</h4>
+<p><a href="#q9">Q9</a> 的雙分支架構特性：<strong>Seedance 以 Prompt 對白文字為唇形 source of truth，上傳音訊僅作語音風格參考</strong>（Reddit r/generativeAI）。crepal.ai 實測：乾淨錄音唇形延遲 40–80ms，嘈雜錄音 120–200ms。</p>
+
+<h4>🛠️ 解法</h4>
+<ul>
+<li>對白 ≤12 詞/10s，≤20 詞/15s（ugccopilot.ai）</li>
+<li>精確時間標籤 <code>[00:01-00:03]</code>；句子間加微停頓標記作重同步錨點</li>
+<li>先用 ElevenLabs/Hume 生成乾淨音檔再 @Audio1 上傳</li>
+<li>減少頭部運動 Prompt（seedance.tv）。ComfyUI 無法修復（<a href="#q9">Q9</a>）</li>
+</ul>
+
+<div class="cite-block"><strong>📖</strong> <a class="paper" href="https://arxiv.org/abs/2512.13507">Seedance 1.5 Pro §3</a> · <a class="paper" href="https://arxiv.org/abs/2604.14148">Seedance 2.0 Model Card §2</a> · <a class="paper" href="https://arxiv.org/abs/2504.02433">OmniTalker (NeurIPS 2025)</a> — joint speech+talking face 的學術參考</div>
+</div></details>
+
+<details id="q22"><summary>Q22: 多角色特徵污染</summary><div class="answer">
+
+<h4>🔍 根因</h4>
+<p>Dynamic Weight Masking（<a href="#q10">Q10</a>）的遮罩 A=Softmax(QKᵀ/√dk+M) 依賴模型特徵解耦能力。角色視覺特徵太接近（同色系、同髮色）→ 解耦失敗。MindStudio 測試：Identity Slot 上限 ~2 角色。</p>
+
+<h4>🛠️ 解法</h4>
+<ul>
+<li><strong>ComfyUI</strong>：Regional Prompting + SAM 預分割，每個 IP-Adapter 只綁定對應 mask 區域</li>
+<li><strong>Seedance</strong>：角色色系差異最大化（紅 vs 藍 >> 紅 vs 橘）。純色背景特寫。<strong>≤2 角色</strong></li>
+</ul>
+
+<div class="cite-block"><strong>📖</strong> <a class="paper" href="https://arxiv.org/abs/2604.14148">Seedance 2.0 Model Card</a> · <a class="paper" href="https://arxiv.org/abs/2308.06721">IP-Adapter §4</a></div>
+</div></details>
+
+<details id="q23"><summary>Q23: 大運鏡背景漂移</summary><div class="answer">
+
+<h4>🔍 根因</h4>
+<p>鏡頭快速移動時，Temporal Attention（<a href="#q4">Q4</a>）窗口不夠大或位置編碼（<a href="#q6">Q6</a>）未捕捉大位移 → 背景 patch 跟丟。</p>
+
+<h4>🛠️ 解法</h4>
+<ul>
+<li><strong>ComfyUI</strong>：CameraCtrl + FreeInit（預設參數）+ Tile ControlNet 三連。Euler sampler，Steps ≥ 25</li>
+<li><strong>Seedance</strong>：<code>@video1</code> 運鏡軌跡參考</li>
+</ul>
+
+<div class="cite-block"><strong>📖</strong> <a class="paper" href="https://arxiv.org/abs/2507.16869">Controllable Video Survey §4.2</a></div>
+</div></details>
+
+<details id="q24"><summary>Q24: 物理互動失敗</summary><div class="answer">
+
+<h4>🔍 根因</h4>
+<p><a href="#q12">Q12</a>：Physics Reward 只讓模型學會「輸出看起來符合物理」，不是真的理解 F=ma。<a class="paper" href="https://arxiv.org/abs/2605.07061">AV-Phys Bench</a>：Seedance 2.0 綜合最佳，但所有模型複雜場景仍頻繁幻覺。</p>
+
+<h4>🛠️ 解法</h4>
+<ul>
+<li>Depth Anything V2 深度先驗 + Tile ControlNet</li>
+<li>分級：簡單（走路）→ 信任模型；中等（開門）→ Depth 輔助；複雜（打鬥）→ ControlNet + DWPose 雙重約束</li>
+</ul>
+
+<div class="cite-block"><strong>📖</strong> <a class="paper" href="https://arxiv.org/abs/2605.07061">AV-Phys Bench §4</a> · <a class="paper" href="https://arxiv.org/abs/2604.14148">Seedance 2.0 Model Card §2</a></div>
+</div></details>
+
+<details id="q25"><summary>Q25: 光源改變面部 + 音軌汙染 + 人臉阻擋</summary><div class="answer">
+
+<p><strong>光源改變面部</strong>：暗場景 Attention 對陰影區 visible features 減少（<a href="#q4">Q4</a>）。解法：多光照參考圖（<code>@image1</code> 亮 + <code>@image2</code> 暗），或亮光生成後製調暗。</p>
+<p><strong>音軌汙染</strong>：Seedance Audio Stream 優先採用影片內嵌音軌（<a href="#q9">Q9</a>–<a href="#q10">Q10</a>）。解法：上傳前將參考影片靜音。</p>
+<p><strong>人臉阻擋</strong>：2026/02 MPA 事件後的 safety filter。社群：網格覆蓋法、AI 虛擬角色臉。根本方案：改用 Kling 3.0。</p>
+
+</div></details>
+
+<details id="q26"><summary>Q26: 畫面閃爍／過飽和</summary><div class="answer">
+<div class="tbl-wrap"><table>
+<tr><th>問題</th><th>解法</th></tr>
+<tr><td>畫面閃爍</td><td>FreeInit（預設參數）；Euler sampler；Steps ≥ 25</td></tr>
+<tr><td>過飽和</td><td>RescaleCFG 0.5–0.7（<a href="#q5">Q5</a>）；降低 Prompt 情緒強度詞；Dynamic Thresholding</td></tr>
+</table></div>
+<div class="cite-block"><strong>📖</strong> <a class="paper" href="https://arxiv.org/abs/2305.08891">RescaleCFG (WACV 2024, §3–4)</a></div>
+</div></details>
+
+<!-- ===== PART 4: WORKFLOW ===== -->
+<h2 class="section-header">四、實戰工作流</h2>
+
+<details><summary>🎛️ ComfyUI 節點速查（含具體參數）</summary><div class="answer">
+<div class="tbl-wrap"><table>
+<tr><th>控制維度</th><th>節點組合</th><th>關鍵參數</th></tr>
+<tr><td>角色面部鎖定</td><td><code>IP-Adapter FaceID Plus V2</code> + <code>FaceDetailer</code></td><td>weight <strong>0.8–0.9</strong>；FaceDetailer denoise <strong>0.2–0.35</strong>（↩ Q24）</td></tr>
+<tr><td>肢體動作控制</td><td><code>DWPose</code> + <code>Depth Anything V2</code>（雙重 ControlNet）</td><td>strength <strong>0.5–0.6</strong>；start=<strong>0.0</strong>, end=<strong>0.7</strong>；CFG ≤ <strong>7</strong>；RescaleCFG <strong>0.6</strong>（↩ Q25）</td></tr>
+<tr><td>空間深度控制</td><td><code>Depth Anything V2</code> + <code>ZoeDepth</code></td><td>複雜場景疊加 Tile ControlNet（↩ Q24）</td></tr>
+<tr><td>運鏡控制</td><td><code>CameraCtrl</code> + <code>FreeInit</code> + <code>Tile ControlNet</code></td><td>FreeInit 預設參數（filter_type=gaussian）；Euler sampler，Steps ≥ 25（↩ Q23）</td></tr>
+<tr><td>區域隔離（多人）</td><td><code>Regional Prompting</code> + SAM + <code>Multiple IP-Adapters</code></td><td>每個 IP-Adapter 只綁定對應 SAM mask 區域；≤ 2 角色最佳（↩ Q22）</td></tr>
+<tr><td>防潰爛（基礎）</td><td><code>RescaleCFG</code> + <code>FreeInit</code></td><td>RescaleCFG <strong>0.5–0.7</strong>；CFG ≤ 7（↩ Q26, Part 1 Q5）</td></tr>
+<tr><td>畫質提升</td><td><code>Ultimate SD Upscale</code> / <code>RealESRGAN</code></td><td>720p → 1080p/4K；不是原生解析度的替代方案（↩ Part 2 Q13）</td></tr>
+</table></div>
+</div></details>
+
+<details><summary>🎬 四種短劇場景標準組合（含完整參數）</summary><div class="answer">
+<div class="tbl-wrap"><table>
+<tr><th>場景</th><th>ComfyUI</th><th>Seedance Prompt</th><th>關鍵數字</th></tr>
+<tr><td><strong>對白近景</strong></td><td><code>IP-Adapter FaceID</code>(0.85) + <code>DWPose Face</code> + <code>RescaleCFG</code>(0.6)</td><td><code>@image1</code>（高清正面頭像）+ <code>[00:01-00:03]</code> 時間標籤</td><td>≤12詞/10s；≤20詞/15s；句子間加停頓錨點</td></tr>
+<tr><td><strong>打鬥／動作</strong></td><td><code>DWPose Full</code> + <code>Depth V2</code>（雙 ControlNet, str=0.55, end=0.7） + <code>RescaleCFG</code>(0.6)</td><td><code>@video1</code>（真人動作參考）</td><td>CFG ≤ 7；禁用否定句</td></tr>
+<tr><td><strong>大運鏡</strong></td><td><code>CameraCtrl</code> + <code>FreeInit</code> + <code>Tile ControlNet</code> + Euler sampler</td><td><code>@image1</code> + <code>@video1</code>（運鏡軌跡）</td><td>Steps ≥ 25；FreeInit 預設參數</td></tr>
+<tr><td><strong>多角色</strong></td><td><code>Regional Prompting</code> + SAM mask + 每個角色獨立 <code>IP-Adapter</code></td><td><code>@image1</code> + <code>@image2</code> 色系差異最大化</td><td>≤2 角色；純色背景特寫</td></tr>
+</table></div>
+</div></details>
+
+<details><summary>⚠️ Seedance 2.0 的關鍵限制（附 Part 1–2 出處）</summary><div class="answer">
+<div class="tbl-wrap"><table>
+<tr><th>限制</th><th>替代方案</th><th>出處</th></tr>
+<tr><td><strong>無 LoRA 支援</strong></td><td>多張高品質參考圖 + IP-Adapter 補強；等 Seedance 2.5</td><td>Part 2 Q10, Q12</td></tr>
+<tr><td><strong>傾向 generic realism</strong></td><td>ComfyUI 後製 style transfer；或 Wan 2.6（開源、有 LoRA）</td><td>Part 2 Q10</td></tr>
+<tr><td><strong>原生雙分支音畫無法在 ComfyUI 重現</strong></td><td>級聯：影片 → MMAudio/AudioLDM 生成音效</td><td>Part 2 Q9</td></tr>
+<tr><td><strong>物理理解不穩健</strong></td><td>複雜場景用 ControlNet + Depth 雙重約束（↩ Q19 分級策略）</td><td>Part 2 Q12, AV-Phys Bench</td></tr>
+<tr><td><strong>原生解析度 480p/720p</strong></td><td>Standard 方案 1080p；或 720p → Topaz/RealESRGAN 升頻</td><td>Part 2 Q13</td></tr>
+<tr><td><strong>最長 15 秒，O(n²) 瓶頸</strong></td><td>每個鏡頭 8–12s 最穩；長片用拼接或等 Seedance 2.5</td><td>Part 2 Q13</td></tr>
+<tr><td><strong>版權過濾（face detection）</strong></td><td>原創角色；極端情況改用 Kling 3.0（↩ Q25）</td><td>Part 2 Q10</td></tr>
+<tr><td><strong>Sora 2 已停止服務</strong></td><td>2026/04/26 關閉 web/app，API 09/24 關閉。不要依賴</td><td>—</td></tr>
+</table></div>
+</div></details>
+
+<details><summary>📚 論文閱讀路線圖（6 層，附 Q 對照）</summary><div class="answer">
+<div class="tbl-wrap"><table>
+<tr><th>層</th><th>論文</th><th>重點章節</th><th>對應 Q</th></tr>
+<tr><td>1 全局觀</td><td><a class="paper" href="https://arxiv.org/abs/2504.16081">Survey of Video Diffusion Models (TMLR 2025)</a><br><a class="paper" href="https://arxiv.org/abs/2507.16869">Controllable Video Survey</a></td><td>§2–3；§3–4</td><td>Part 1 Q3, Q6</td></tr>
+<tr><td>2 你的工具</td><td><a class="paper" href="https://arxiv.org/abs/2512.13507">Seedance 1.5 Pro</a><br><a class="paper" href="https://arxiv.org/abs/2604.14148">Seedance 2.0</a></td><td>§3–4；Model Card §1–2</td><td>Part 2 Q9–Q13</td></tr>
+<tr><td>3 架構變革</td><td><a class="paper" href="https://arxiv.org/abs/2212.09748">DiT (ICCV 2023)</a><br><a class="paper" href="https://arxiv.org/abs/2403.03206">SD3/MMDiT</a><br><a class="paper" href="https://arxiv.org/abs/2210.02747">Flow Matching (ICLR 2023)</a></td><td>§3–4</td><td>Part 1 Q3, Q7</td></tr>
+<tr><td>4 操控技術</td><td><a class="paper" href="https://arxiv.org/abs/2302.05543">ControlNet (ICCV 2023)</a><br><a class="paper" href="https://arxiv.org/abs/2308.06721">IP-Adapter</a><br><a class="paper" href="https://arxiv.org/abs/2404.16022">PuLID</a></td><td>§3.1–3.3；§4；§3–4</td><td>Part 3 Q19, Q20</td></tr>
+<tr><td>5 去幻覺</td><td><a class="paper" href="https://arxiv.org/abs/2207.12598">CFG</a><br><a class="paper" href="https://arxiv.org/abs/2305.08891">RescaleCFG (WACV 2024)</a><br><a class="paper" href="https://arxiv.org/abs/2305.18290">DPO (NeurIPS 2023)</a></td><td>§3；§3–4；§3</td><td>Part 1 Q5；Part 3 Q20, Q26</td></tr>
+<tr><td>6 前沿</td><td><a class="paper" href="https://arxiv.org/abs/2604.06339">Evolution of Video Generative Foundations</a><span class="badge badge-partial">預印本</span><br><a class="paper" href="https://arxiv.org/abs/2605.07061">AV-Phys Bench</a><span class="badge badge-partial">預印本</span><br><a class="paper" href="https://arxiv.org/abs/2509.24899">Attention Surgery</a><br><a class="paper" href="https://arxiv.org/abs/2604.15911">Efficient Video Diffusion Survey</a></td><td>全文；§4；§1；§3</td><td>Part 2 Q12, Q13；Part 3 Q24</td></tr>
+</table></div>
+</div></details>
+
+
+</main>
+
+<footer>
+  <p>由 Claude Fable 5 整理 · 來源：<a href="https://share.gemini.google/Jqa3sF8Vg28S">Gemini Deep Research</a> + 15+ 篇學術論文 + Reddit 社群討論</p>
+  <p style="margin-top:.3rem">內容以 <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a> 釋出 · 最後更新 2026-07-25</p>
+</footer>
+
+<script>
+const T2S={"著":"着","體":"体","對":"对","會":"会","們":"们","來":"来","開":"开","關":"关","機":"机","後":"后","畫":"画","聲":"声","聽":"听","點":"点","學":"学","說":"说","長":"长","門":"门","間":"间","見":"见","頭":"头","萬":"万","裡":"里","兒":"儿","氣":"气","時":"时","過":"过","為":"为","嗎":"吗","樣":"样","麼":"么","國":"国","動":"动","種":"种","實":"实","從":"从","這":"这","當":"当","還":"还","沒":"没","電":"电","話":"话","視":"视","車":"车","東":"东","經":"经","網":"网","飛":"飞","馬":"马","鳥":"鸟","魚":"鱼","龍":"龙","僅":"仅","單":"单","層":"层","將":"将","無":"无","極":"极","擇":"择","數":"数","據":"据","確":"确","標":"标","準":"准","導":"导","師":"师","團":"团","隊":"队","際":"际","圍":"围","雜":"杂","亂":"乱","潰":"溃","爛":"烂","隱":"隐","穩":"稳","態":"态","歷":"历","異":"异","衛":"卫","護":"护","讓":"让","調":"调","設":"设","計":"计","試":"试","認":"认","識":"识","誤":"误","證":"证","評":"评","論":"论","該":"该","誰":"谁","許":"许","請":"请","謝":"谢","讚":"赞","議":"议","變":"变","爭":"争","權":"权","參":"参","觀":"观","圖":"图","線":"线","於":"于","與":"与","寫":"写","處":"处","雖":"虽","壓":"压","縮":"缩","擴":"扩","構":"构","連":"连","進":"进","運":"运","驗":"验","顯":"显","預":"预","類":"类","風":"风","區":"区","別":"别","剛":"刚","業":"业","嚴":"严","質":"质","創":"创","節":"节","術":"术","藝":"艺","藥":"药","響":"响","優":"优","勢":"势","價":"价","塊":"块","紋":"纹","錄":"录","鏡":"镜","鍵":"键","鏈":"链","錯誤":"错误","輸入":"输入","輸出":"输出","選擇":"选择","執行":"执行","應用":"应用","繼續":"继续","歷史":"历史","範圍":"范围"}
+const S2T={};for(const[k,v]of Object.entries(T2S))S2T[v]=k
+
+// Default: Simplified. Toggle to Traditional.
+let isTraditional=false
+const originals=new Map()
+let converted=false
+
+function walkTextNodes(root,fn){const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null,false);while(w.nextNode())fn(w.currentNode)}
+
+function convertText(text,map){let r='';for(let i=0;i<text.length;){let m=false;if(i+1<text.length){const t2=text.substring(i,i+2);if(map[t2]){r+=map[t2];i+=2;m=true;continue}}const t1=text[i];if(map[t1]){r+=map[t1];i++;m=true;continue}r+=t1;i++}return r}
+
+// Run T→S conversion once on page load
+function initLang(){const m=document.querySelector('main');walkTextNodes(m,n=>{if(!originals.has(n))originals.set(n,n.textContent);n.textContent=convertText(n.textContent,T2S)});converted=true;document.documentElement.lang='zh-CN'}
+document.addEventListener('DOMContentLoaded',initLang)
+initLang() // fallback if DOM already loaded
+
+function toggleLang(){const m=document.querySelector('main');const b=document.getElementById('lang-toggle')
+if(!isTraditional){walkTextNodes(m,n=>{if(originals.has(n))n.textContent=originals.get(n)});b.textContent='簡';document.documentElement.lang='zh-TW';isTraditional=true}
+else{originals.clear();walkTextNodes(m,n=>{if(!originals.has(n))originals.set(n,n.textContent);n.textContent=convertText(n.textContent,T2S)});converted=true;b.textContent='繁';document.documentElement.lang='zh-CN';isTraditional=false}
+}
+</script>
+</body>
+</html>
+<!-- updated 2026-07-26 -->
