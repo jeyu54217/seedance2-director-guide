@@ -13,11 +13,11 @@ sidebar:
 
 如果各模態分開處理——文字走 Text Encoder、圖片走 VAE Encoder、影片再走另一個 encoder——各自算完再硬接，**不同模態的 token 從未在同一個計算空間中互相對齊**。文字說「金髮」，圖片 token 不知道；參考圖鎖定了角色外觀，但 prompt 的場景描述和參考影片的運鏡節奏互不協調。
 
-融合的做法：每種輸入走自己的編碼器保留專屬特徵，再把各自產出的 token 串進同一條序列，由 DiT 的 **Joint Self-Attention（聯合自注意力）** 統一處理。**編碼階段各走各的，計算階段一起算**。
-
 ## 機制：三步
 
 ### 第一步：各模態走自己的編碼路徑
+
+每種輸入有專屬的編碼器，產出 token 序列：
 
 | 模態 | 編碼器 | 輸出 token | 位置編碼 |
 |------|--------|-----------|----------|
@@ -28,21 +28,25 @@ sidebar:
 
 文字編碼沿用 [Q4：Attention 機制](#q4) 的 CLIP/T5-XXL。圖片 Patchify 沿用 [Q3：圖像區塊化與 DiT](#q3)：VAE 壓成 latent，切成 patch，每個 patch 是一個 token 附 2D 位置編碼。影片換成 **3D causal VAE**，額外加上時間軸壓縮——圖片 token 只有空間位置，影片 token 有空間+時間雙重編碼。時空 patch 概念源於 **Sora（OpenAI, 2024）**，**CogVideoX（Yang et al., 2024）** 將其與 MM-DiT 架構結合。
 
-### 第二步：串聯成單一序列 + Joint Self-Attention
+### 第二步：串聯成單一序列
 
-所有 token 串在一起，加上**模態位置編碼（Modality-Specific Position Embedding）** 標記每個 token 的來源模態：
+所有 token 串在一起：
 
 ```
 [ text_tokens | image_tokens | video_tokens | noise_tokens ]
 ```
 
-這條序列就是 DiT 每一步去噪的全部輸入。Self-Attention 在整條序列上運算——每個 token 看向所有其他 token，文字可以看向圖片、圖片看向 noise、noise 看向影片。數學上就是標準的 `Attention(Q, K, V) = softmax(QKᵀ/√d) × V`，只是輸入序列包含了多模態。
+這條序列就是 DiT 每一步去噪的全部輸入。
+
+但單純串聯還不夠——Transformer 需要知道每個 token 來自哪個模態。除了第一步表格中的 per-modality 位置編碼（token 在自身模態內的空間/時間位置），還要疊加一層**模態標記（Modality-Specific Position Embedding）**，告訴 DiT「這一區是文字」「這一區是圖片」。兩層位置編碼疊加，模型同時知道 token 的空間位置和來源模態。
+
+### 第三步：Joint Self-Attention——跨模態對話
+
+串聯後的序列送進 DiT，Self-Attention 在整條序列上運算——每個 token 看向所有其他 token。文字可以看向圖片、圖片看向 noise、noise 看向影片。數學上就是標準的 `Attention(Q, K, V) = softmax(QKᵀ/√d) × V`，只是輸入序列包含了多模態。
 
 關鍵設計是 **MM-DiT（Multi-Modal Diffusion Transformer，多模態擴散 Transformer）**（SD3, Esser et al., 2024）：Text 和 Visual 各自有獨立的 MLP 和 LayerNorm，但在 Self-Attention 層共用 QKV 計算——各自權重、共用 Attention。每種模態在 Attention 前先經過 **AdaLN（Adaptive Layer Normalization，適應性層正規化）**，確保不同模態的特徵在融合前已被正規化到可比範圍。
 
-### 第三步：跨模態一致性從哪裡來
-
-參考圖的 visual token 和 noise token 在每一步去噪、每一層 Attention 中一起計算。從 step 999 到 step 0，noise token 持續看向參考圖 token，每一步都在調整生成畫面的特徵向量，使其與參考圖對齊。這就是角色跨多秒不變臉的機制——不是事後修圖，是每層每步持續對齊。
+這就是跨模態一致性的來源：參考圖的 visual token 和 noise token 在每一步去噪、每一層 Attention 中一起計算。從 step 999 到 step 0，noise token 持續看向參考圖 token，每一步都在調整特徵向量使其與參考圖對齊。角色跨多秒不變臉——不是事後修圖，是每層每步持續對齊。
 
 `@image1` 的 visual token 透過 attention mask 精確路由，確保「這個角色」的 noise token 只看「這張參考圖」的 key/value——詳見 [Q11：@ 標籤機制](#q11)。
 
