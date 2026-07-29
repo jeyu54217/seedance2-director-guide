@@ -55,6 +55,7 @@ Static site. Custom build.mjs converts MDX→single-page HTML. 30 Q&A pages, 4 s
 - **mermaid 圖表**: 僅 Part 1 Q1 使用，其餘章節以文字或表格敘述
 - **語言**: 繁體中文，技術術語保留英文原名（括號標註）
 - **提交**: conventional commits (`refactor:`, `feat:`, `fix:`, `chore:`)
+- **推送**: 每次更新完必須 commit 並 push 到 GitHub（`git push`）
 
 ## 陷阱
 - README.md 是舊的 Starlight boilerplate，專案不使用 Astro/Starlight
