@@ -32,8 +32,9 @@ Static site. Custom build.mjs converts MDX→single-page HTML. 30 Q&A pages, 4 s
 
 ### 事實查證
 1. **論文原文優先**：所有技術定義必須先查閱原始論文（arXiv PDF），依照論文原文撰寫
-2. **次級來源輔助**：搜尋 Reddit、Hacker News、GitHub Discussions 等論壇的權威討論作為補充
-3. **禁止憑空杜撰**：不得憑記憶或訓練資料寫技術定義。不確定處標註 `:::caution[⚠️ 誠實揭露]`
+2. **論文必須附超連結**：每次提到論文（無論是 `:::note[📖 引用論文]` 區塊還是內文引用），都必須附上 arXiv 超連結。不可只寫「某某論文說」而不給連結
+3. **次級來源輔助**：搜尋 Reddit、Hacker News、GitHub Discussions 等論壇的權威討論作為補充
+4. **禁止憑空杜撰**：不得憑記憶或訓練資料寫技術定義。不確定處標註 `:::caution[⚠️ 誠實揭露]`
 
 ### 紅字節制
 `**bold**` 和 `<span class="kw">` 在 CSS 中皆渲染為橘紅色（`var(--accent)`）。全文紅字總數控制在 5 處以下。只在核心術語首次出現和關鍵導演句使用。
