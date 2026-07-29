@@ -21,7 +21,7 @@ Attention 讓 token 互相對看、也看外部指令——Cross-Attention 是�
 
 ## Cross-Attention：導演操控模型的入口
 
-Cross-Attention 是 token 接收外部指令的窗口——Prompt、參考圖、ControlNet 骨架全部從這裡注入。
+Cross-Attention 是 token 接收外部指令的窗口——Prompt、參考圖全部從這裡注入。（ControlNet 走不同路徑：它有自己獨立的 encoder，透過 residual connection 把骨架訊號注入 UNet 中間層，不走 Cross-Attention。）
 
 **參考圖為什麼會互相汙染？** `@image1`（紅衣）和 `@image2`（白衣）同時存在，Cross-Attention 沒正確隔離兩組 Key/Value → 紅色滲透到白色區。這就是**特徵污染（Feature Bleeding）**。解法：參考圖用純色背景的乾淨特寫。
 
@@ -31,10 +31,10 @@ Prompt 是中文字，模型讀不了。需要 **Text Encoder（文字編碼器�
 
 1. CLIP 對視覺詞敏感、對抽象詞較弱——多給具體視覺線索。
 2. CLIP 有 **77 token 上限**——長 Prompt 會被截斷，關鍵詞放前面。
-3. Seedance 2.0 用更強的 T5-XXL，上下文更長。
+3. 業界頂尖模型（如 Imagen）用更強的 T5-XXL 做 text encoder，上下文遠超 77 token。Seedance 2.0 未揭露內部 text encoder 選型。
 
 :::tip[🎬 導演要點]
-Cross-Attention 是操控入口——Prompt、@image1、ControlNet 全部走這條路。
+Cross-Attention 是 Prompt 和參考圖的操控入口——@image1 在這裡建立參考點。ControlNet 走獨立 encoder，不走這條路。
 
 參考圖用純色背景。兩個以上參考圖，色系差異越大越好。
 
@@ -42,9 +42,13 @@ Prompt 被 CLIP 編碼成向量，77 token 後截斷——關鍵資訊放前面�
 :::
 
 :::note[📖 引用論文]
-[DiT §3.1](https://arxiv.org/abs/2212.09748) — Self/Cross-Attention。
+[DiT (Peebles & Xie, ICCV 2023, §3.1)](https://arxiv.org/abs/2212.09748) — Self/Cross-Attention。
+
+[Survey of Video Diffusion Models (Wang et al., TMLR 2025, §3.3)](https://arxiv.org/abs/2504.16081) — Temporal Attention 與影片 DiT 架構。
 
 [IP-Adapter (Ye et al., 2023, §3.2, §4)](https://arxiv.org/abs/2308.06721) — 解耦 Cross-Attention。
 
-[LDM §4.2](https://arxiv.org/abs/2112.10752) — CLIP Text Encoder。
+[LDM (Rombach et al., CVPR 2022, §4.2)](https://arxiv.org/abs/2112.10752) — CLIP Text Encoder。
+
+[ControlNet (Zhang et al., ICCV 2023, §3.1)](https://arxiv.org/abs/2302.05543) — ControlNet 走獨立 encoder + residual injection，不走 Cross-Attention。
 :::
