@@ -1,21 +1,14 @@
 {
   "name": "seedance2-director-guide",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "scripts": {
-    "dev": "astro dev",
-    "start": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro"
+    "build": "node build.mjs",
+    "dev": "node build.mjs && npx serve dist"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.41.5",
-    "astro": "^7.0.2",
-    "sharp": "^0.34.5"
-  },
-  "allowScripts": {
-    "esbuild@0.28.1": true,
-    "sharp@0.34.5": true
+    "glob": "^11.0.0",
+    "gray-matter": "^4.0.3",
+    "markdown-it": "^14.1.0"
   }
 }
