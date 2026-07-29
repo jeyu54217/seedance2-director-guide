@@ -38,6 +38,14 @@ Static site. Custom build.mjs converts MDX→single-page HTML. 30 Q&A pages, 4 s
 ### 紅字節制
 `**bold**` 和 `<span class="kw">` 在 CSS 中皆渲染為橘紅色（`var(--accent)`）。全文紅字總數控制在 5 處以下。只在核心術語首次出現和關鍵導演句使用。
 
+### 術語首次出現
+所有縮寫（VAE、CFG、DiT、CLIP 等）必須在首次出現時展開全名，格式：`VAE（Variational Autoencoder，變分自編碼器）`。不可假設讀者認識縮寫。
+
+### 圖片
+- 靜態圖片放 `public/`，建置時自動複製到 `dist/`
+- MDX 中圖片路徑用相對路徑（`latent-space.png`），**不可**用前導斜線（`/latent-space.png`）——GitHub Pages 部署在子目錄下，絕對路徑會指向 domain root 而非 repo root
+- `.answer img{max-width:100%;height:auto}` 已內建在 CSS 中，圖片自動 responsive，不需額外處理
+
 ## 約定
 - **檔案命名**: `q##-slug.mdx`，編號跨章節連續 (Q1–Q26)
 - **Frontmatter**: `title`, `description`, `sidebar: { order: N }`
