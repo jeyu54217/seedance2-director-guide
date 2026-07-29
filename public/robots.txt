@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jeyu54217.github.io/seedance2-director-guide/sitemap-index.xml

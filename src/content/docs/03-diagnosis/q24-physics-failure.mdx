@@ -1,0 +1,19 @@
+---
+title: 物理互動失敗
+description: Physics Reward 只讓模型學會輸出看起來符合物理的畫面——不是真的理解 F=ma
+sidebar:
+  order: 6
+---
+
+## 🔍 根因
+
+Q12：Physics Reward 只讓模型學會「輸出看起來符合物理」，不是真的理解 F=ma。[AV-Phys Bench](https://arxiv.org/abs/2605.07061)：Seedance 2.0 綜合最佳，但所有模型複雜場景仍頻繁幻覺。
+
+## 🛠️ 解法
+
+- Depth Anything V2 深度先驗 + Tile ControlNet
+- 分級：簡單（走路）→ 信任模型；中等（開門）→ Depth 輔助；複雜（打鬥）→ ControlNet + DWPose 雙重約束
+
+:::note[📖]
+[AV-Phys Bench §4](https://arxiv.org/abs/2605.07061) · [Seedance 2.0 Model Card §2](https://arxiv.org/abs/2604.14148)
+:::

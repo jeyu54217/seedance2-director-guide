@@ -1,0 +1,15 @@
+---
+title: 畫面閃爍／過飽和
+description: FreeInit 修閃爍，RescaleCFG 修過飽和——具體參數對照
+sidebar:
+  order: 8
+---
+
+| 問題 | 解法 |
+|---|---|
+| 畫面閃爍 | FreeInit（預設參數）；Euler sampler；Steps ≥ 25 |
+| 過飽和 | RescaleCFG 0.5–0.7（Q5）；降低 Prompt 情緒強度詞；Dynamic Thresholding |
+
+:::note[📖]
+[RescaleCFG (WACV 2024, §3–4)](https://arxiv.org/abs/2305.08891)
+:::

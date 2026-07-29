@@ -1,0 +1,40 @@
+---
+title: 去噪這麼多步，模型怎麼知道每一步該做什麼？
+description: 時間步調節（Timestep Conditioning）管進度，位置編碼管座標，理解 AdaLN-Zero 機制
+sidebar:
+  order: 6
+---
+
+## 一句話
+
+時間步調節管進度（大局還是細節），位置編碼管座標（token 在畫面哪裡）。
+
+## 時間步調節（Timestep Conditioning）：烘焙計時器
+
+蛋糕第 5 分鐘和第 25 分鐘需要不同火候。去噪也一樣——早期（t 大，全是雜訊）做構圖、姿態、光影；後期（t 小，接近乾淨）做皮膚紋理、衣服褶皺。
+
+[DiT (Peebles & Xie, ICCV 2023, §3.2)](https://arxiv.org/abs/2212.09748) 用 **AdaLN-Zero**：小型 MLP 根據 timestep t 產生 scale（γ）和 shift（β），注入每個 Transformer Block。t=999 → 大開大合；t=10 → 小心翼翼。
+
+## 位置編碼（Positional Encoding）：token 的 GPS
+
+每個 token 需要知道自己在畫面哪裡——「我是左上角」「我是第 7 幀」。方法有兩種：正弦式（Sinusoidal）和旋轉式（RoPE）。Q3 的 Positional Encoding 就是在做這件事。
+
+## 從圖片到影片：多一條時間軸
+
+影片 DiT 把潛在空間從 2D（寬×高）擴到 3D（寬×高×時間）。位置編碼要同時標空間和幀號，Attention 新增 Temporal Attention 處理跨幀溝通。token 數量隨時間線性成長，attention 計算量隨 token 平方成長——這是影片比圖片難這麼多的核心原因（Q13 展開）。
+
+:::tip[🎬 導演要點]
+去噪前後段行為不同。
+
+調構圖 → 動前段（ControlNet 介入時機、初期 CFG）。
+
+調細節 → 動後段（RescaleCFG、FreeInit）。
+
+**前段管骨架，後段管皮膚**——記住這個分界。
+:::
+
+:::note[📖 引用論文]
+[DiT §3.2](https://arxiv.org/abs/2212.09748) — AdaLN-Zero。
+
+[Survey of Video Diffusion Models §3.3](https://arxiv.org/abs/2504.16081) — 圖片→影片 DiT。
+:::

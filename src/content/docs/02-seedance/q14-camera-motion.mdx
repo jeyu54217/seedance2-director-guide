@@ -1,0 +1,46 @@
+---
+title: 為什麼沒寫運鏡術語，Seedance 輸出的影片卻有鏡頭在動？
+description: 運鏡不是 Self-Attention 決定的——是預訓練視覺先驗 + Temporal Attention 平滑 + RLHF 美學獎勵疊加結果
+sidebar:
+  order: 6
+---
+
+## 一句話
+
+運鏡不是 Self-Attention「決定」的——是預訓練視覺先驗 + Temporal Attention 平滑 + RLHF 美學獎勵 + 參考影片運動提取，四層機制疊加的結果。
+
+## 先確認現象
+
+Seedance 1.5 Pro 論文 abstract 提到「dynamic cinematic camera control」，Q12 說明了 SFT 階段用專業影視數據訓練——但這些描述的是 **explicit control**（模型能理解並執行你指定的運鏡術語），不是 emergent behavior（你沒指定，它自己產生的運鏡）。後者才是我們要討論的。
+
+## 來源一：預訓練的視覺先驗（最主要）
+
+Seedance 1.5 Pro §3–4 描述的三階段訓練中，預訓練階段使用了**數億組音影片**。這些影片絕大多數不是靜止鏡頭——它們有 subtle push-in、輕微 handheld、緩慢 pan。完全靜止的幀序列在訓練數據中極少出現。
+
+模型學到的不是「這個場景該用 dolly in」這種 explicit rule，而是**「畫面不該完全靜止」的統計分佈先驗**。生成時，這個先驗表現為：token 序列自然帶有運動趨勢。同時，SFT 階段的專業影視數據進一步內化了「cinematic = 有運鏡」的美學偏好——即使 prompt 沒寫運鏡。
+
+## 來源二：Temporal Attention 的幀間平滑
+
+影片 DiT 的 Temporal Attention（Q4、Q6）在相鄰幀的 token 之間建立關聯。它學到的不是「這裡該做 pan」，而是**「相鄰幀的全局位移應該平滑連續」**——這本質上就是運鏡的數學形式。[Survey of Video Diffusion Models（TMLR 2025, §3.3）](https://arxiv.org/abs/2504.16081) 描述了 Temporal Attention 如何在時間軸上維持一致性。推論：Temporal Attention 的平滑約束在全局層面自然表現為鏡頭運動。
+
+## 來源三：RLHF 美學獎勵
+
+Seedance 1.5 Pro §4 描述了多維度獎勵模型，其中 **Aesthetics Reward** 的評分維度包含「構圖、色彩、**鏡頭語言**」。RLHF 訓練過程中，有 subtle camera movement 的輸出獲得的獎勵分數 > 完全靜止的輸出。這不是 prompt 要求的——是 reward model 訓練出來的偏好，在推理時自動生效。
+
+## 來源四：參考影片的運動提取
+
+如果你上傳了參考影片（如 `@video1`），Seedance 會透過 Q11 的 @video 機制提取影片中的 motion pattern——包括鏡頭運動——並套用到生成畫面。但如果你沒有上傳參考影片，這層就不適用。
+
+## 小結
+
+**Self-Attention 和 Temporal Attention 是實現機制（how）**——它們提供了 token 之間交換資訊和維持時間一致性的能力。**但運鏡的方向、速度、節奏來自訓練數據的分佈（what）**——模型不是「決定要做 dolly in」，而是它生成的 token 序列在統計上不可能完全靜止。
+
+:::tip[🎬 導演要點]
+如果你不想要模型自己加的運鏡，prompt 中明確指定「static shot, locked-off camera, no camera movement」。nemovideo.com 的結論：「No camera line = the model decides. Sometimes it gets lucky. Most of the time, it doesn't.」
+:::
+
+:::note[📖 引用論文]
+[Seedance 1.5 Pro §3–4](https://arxiv.org/abs/2512.13507) — 三階段訓練與多維度獎勵模型。
+
+[Survey of Video Diffusion Models (TMLR 2025, §3.3)](https://arxiv.org/abs/2504.16081) — Temporal Attention 的時間軸一致性。
+:::

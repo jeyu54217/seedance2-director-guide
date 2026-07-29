@@ -1,0 +1,42 @@
+---
+title: 用中文寫 prompt 跟用英文寫，Seedance 的理解有差嗎？
+description: 訓練數據以中文影片為主，中文場景覆蓋率更高；英文攝影術語也完全可用
+sidebar:
+  order: 10
+---
+
+## 一句話
+
+兩篇 Seedance 論文沒提語言特性——但訓練數據以中文影片為主，中文 prompt 的場景覆蓋率更高；英文攝影術語也完全可用。
+
+## 論文面
+
+Seedance 1.5 Pro 和 2.0 Model Card **均未描述 text encoder 的語言特性**。沒有提及支援哪些語言、用什麼 encoder、或中英文的處理差異。
+
+## 產品面
+
+Seedance 2.0 原生平台是**即夢（Jimeng）**，中國市場為主，中文 prompt 是原生用法。國際版（seedance.ai）支援英文，攝影術語（dolly, pan, tracking shot, shallow depth of field）理解良好。Prompt 字元上限 2000，以 `len()` 計算——中文每字 = 1 字元，英文 prompt 更容易碰到上限。
+
+## 為什麼中文可能更精準？
+
+訓練數據以中國影片為主（抖音、西瓜視頻），中文描述的**場景覆蓋率更高**——中文 prompt 能觸及的 training data manifold 更密集。文化特定概念（古風、武俠、江湖、國潮）用中文 prompt 遠優於英文翻譯——這些概念的語意很難完整對譯。
+
+## 英文也完全可用
+
+英文攝影術語理解良好。國際版就是以英文為預設界面。GitHub 上的 Seedance prompt 技能庫（Emily2040/seedance-2.0）同時提供中英日韓四語支援。
+
+## 推論：text encoder 架構
+
+字節跳動其他模型（如 Seedream）的實踐暗示，Seedance 2.0 的 text encoder 很可能是**中英雙語聯合訓練**——不是「先翻譯成英文再編碼」，而是兩種語言的語意在相同 embedding space 中有對應關係。但這是推論，官方未確認。
+
+:::caution[⚠️ 誠實揭露]
+以上關於 text encoder 語言特性和訓練數據分佈的分析為基於產品行為和社群共識的推論。Seedance 論文未提供相關資訊。
+:::
+
+:::note[📖]
+GitHub Emily2040/seedance-2.0 — 多語 prompt 技能庫。
+
+GitHub songguoxs/seedance-prompt-skill — 中文 prompt 工程指南。
+
+Reddit r/generativeAI — Seedance 2.0 非英語語言表現討論。
+:::

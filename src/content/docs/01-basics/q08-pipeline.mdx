@@ -1,0 +1,37 @@
+---
+title: 全部串起來——從 Prompt 到畫面，完整走一遍
+description: 五站流水線：Prompt → 文字向量 → 初始雜訊 → N 步去噪 → 解碼成像素
+sidebar:
+  order: 8
+---
+
+## 一句話
+
+五站流水線——Prompt → 文字向量 → 初始雜訊 → N 步去噪 → 解碼成像素。
+
+## 逐步走訪
+
+1. **文字編碼**：Prompt → **Text Encoder**（CLIP / T5-XXL）→ Text Embedding（Q4）。
+2. **參考素材編碼**（選擇性）：參考圖/影片 → **VAE Encoder** → Image/Video Latent（Q2）。
+3. **生成初始雜訊**：隨機 latent，尺寸匹配目標畫面。雕刻的起點（Q1）。
+4. **迭代去噪（N 步核心迴圈）**：
+   - a. Timestep t → **AdaLN** 調整行為模式（Q6）
+   - b. **Self-Attention**：token 對戲，建立內部一致性（Q4）
+   - c. **Cross-Attention**：token 查閱 Text Embedding + 參考素材（Q4）
+   - d. MLP：非線性變換，豐富表達
+   - e. 預測雜訊 → 從 latent 減去 → 乾淨一點（Q1）
+5. **解碼輸出**：最終乾淨 latent → **VAE Decoder** → 像素畫面（Q2）。
+
+到這裡，一個畫面從無到有的完整路徑就追完了。
+
+:::tip[🎬 導演要點]
+每一步都標了對應的 Q——忘記哪個環節就跳回去看。
+
+控制點總覽：Prompt（Q4 的 Text Encoder）、CFG（Q5）、Steps（Q7）、參考圖（Q4 的 Cross-Attention）、前後段參數（Q6）。
+:::
+
+:::note[📖 引用論文]
+[LDM (Rombach et al., CVPR 2022, §3–4)](https://arxiv.org/abs/2112.10752) — 完整 pipeline。
+
+[DiT (Peebles & Xie, ICCV 2023, §3)](https://arxiv.org/abs/2212.09748) — Transformer 去噪迴圈。
+:::

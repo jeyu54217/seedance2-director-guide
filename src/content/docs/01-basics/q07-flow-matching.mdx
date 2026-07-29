@@ -1,0 +1,40 @@
+---
+title: 為什麼新模型幾十步就夠？什麼是 Flow Matching？
+description: DDPM 在濃霧中摸黑，Flow Matching 有 GPS 導航——方向已知，步伐可以大
+sidebar:
+  order: 7
+---
+
+## 一句話
+
+DDPM 在濃霧中摸黑，Flow Matching 有 GPS 導航——方向已知，步伐可以大。
+
+## DDPM：預測雜訊，一步一步擦
+
+傳統擴散（DDPM）每一步預測「現在有多少雜訊，該擦掉多少」。像在濃霧中走迷宮——每步重新判斷方向。要走 1000 步才到終點。
+
+## Flow Matching：預測方向，跟著箭頭走
+
+Flow Matching 不預測雜訊量——預測**「往乾淨畫面的方向是哪邊」**。這是一條連續的向量場（Vector Field），起點到終點是平滑曲線。方向早就確定了，步伐可以大。1000 步 → 50 步，品質一樣好。（[Lipman et al., ICLR 2023, §2–3](https://arxiv.org/abs/2210.02747)）
+
+## 和 Q6 的關聯：連續時間讓 AdaLN 更平滑
+
+Q6 的 AdaLN 需要 timestep t。DDPM 的 t 是離散的（1,2,3...1000）；Flow Matching 的 t 是連續的 [0,1]。AdaLN 在連續曲線上滑動，調節更平滑——不是 1000 級階梯，是一條斜坡。
+
+:::caution[⚠️ 誠實揭露]
+Seedance 2.0 論文是 Model Card，未明確說用 Flow Matching。但 SD3、FLUX、HunyuanVideo 全部基於此。MIT 課程（[Holderrieth et al., §4–5](https://arxiv.org/abs/2506.02070)）有入門圖解。
+:::
+
+:::tip[🎬 導演要點]
+新模型 Steps 設 20–30 就夠——不是幻覺，是 Flow Matching 的數學保證。
+
+舊「Steps 一定 50+」的經驗在新模型上不適用。
+
+Seedance 2.0 沒公開確認用 Flow Matching，但行為完全一致。
+:::
+
+:::note[📖 引用論文]
+[Flow Matching (Lipman et al., ICLR 2023, §2–3)](https://arxiv.org/abs/2210.02747)。
+
+[MIT 課程 (Holderrieth et al., §4–5)](https://arxiv.org/abs/2506.02070)。
+:::

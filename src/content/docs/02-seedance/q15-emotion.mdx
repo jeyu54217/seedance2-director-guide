@@ -1,0 +1,53 @@
+---
+title: 「無奈的笑」「笑容僵住面色凝重」——Seedance 怎麼理解情緒？
+description: 沒有情緒理解模組——Text Encoder 把情緒描述編成語意向量，Cross-Attention 映射為臉部 blendshape
+sidebar:
+  order: 7
+---
+
+## 一句話
+
+Seedance 沒有情緒理解模組——Text Encoder 把「無奈的笑」編成一個同時包含情緒和臉部動作的語意向量，Cross-Attention 在去噪中把它映射為對應的臉部 blendshape 組合。
+
+## 論文說了什麼
+
+兩篇 Seedance 論文**均未描述情緒理解機制**。Model Card 和 1.5 Pro 技術報告都沒有提到 emotion recognition module、facial expression model、或任何情緒相關的架構組件。
+
+## 產品行為
+
+從 seedanceai.cc 的能力描述和社群實測可以確認：Seedance 2.0 的「角色面部微表情（眼部運動、嘴形、眉毛位置）和肢體語言（手勢、姿勢、動作強度）會回應 prompt 中描述的情緒脈絡」。而且具體的物理描述優於抽象情緒標籤——"'Gentle smile with a slight head tilt' produces more nuanced results than just 'happy'。"
+
+## 推論機制
+
+底層機制推測如下：
+
+```
+Prompt 中的「無奈的笑」
+        ↓
+Text Encoder（CLIP / T5-XXL）
+        ↓
+語意向量：同時捕捉「無奈」（情緒valence） + 「笑」（臉部動作配置）
+        ↓
+Cross-Attention 注入 Video Branch 的面部區域 latent tokens
+        ↓
+去噪過程中，面部 latent 被條件化為特定 blendshape 組合：
+嘴角微揚（笑），但眉頭微蹙、眼神缺乏笑意（無奈）
+```
+
+這不是離散的情緒分類器（happy=0.8, sad=0.2），而是**連續的語意映射**。Text Encoder 在訓練中學到了「無奈的笑」對應的臉部肌肉配置——因為訓練數據中有大量標註了情緒描述的影片。
+
+「**笑容僵住面色凝重**」這類情緒過渡則是透過 **Temporal Attention** 在兩幀之間平滑 expression shift 來實現的。
+
+## 社群實證：FACS 精確控制
+
+Reddit r/generativeAI 社群有人用 **FACS（Facial Action Coding System）** 圖表作為參考圖上傳到 Seedance 2.0，在 prompt 中指定 AU（Action Unit）編碼來精確控制特定臉部肌肉的動作——驗證了模型透過 reference image 可以實現比文字描述更精細的表情控制。
+
+:::caution[⚠️ 誠實揭露]
+以上機制描述為基於 DiT 架構（Text Encoder + Cross-Attention）和產品行為的推論。Seedance 論文未描述情緒理解的內部實現。
+:::
+
+:::note[📖 引用論文]
+[DiT (ICCV 2023, §3.1)](https://arxiv.org/abs/2212.09748) — Cross-Attention 條件化機制。
+
+[LDM (CVPR 2022, §4.2)](https://arxiv.org/abs/2112.10752) — CLIP Text Encoder 的語意映射。
+:::

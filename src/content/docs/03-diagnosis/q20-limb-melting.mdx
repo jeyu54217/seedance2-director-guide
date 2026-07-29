@@ -1,0 +1,19 @@
+---
+title: 肢體融化、多手多腳
+description: 高 CFG 導致 SNR 崩潰，去噪後段把肢體結構當雜訊砍了——缺乏幾何約束
+sidebar:
+  order: 2
+---
+
+## 🔍 根因
+
+高 CFG → SNR 崩潰（Q5），去噪後段把肢體結構當雜訊砍了。缺乏幾何約束（Q1），去噪前段姿態框架沒建立好（Q6），後段在錯誤框架上補細節。
+
+## 🛠️ 解法
+
+- **ComfyUI**：DWPose Full Body + Depth Anything V2 雙 ControlNet，strength **0.5–0.6**，start=0.0, end=**0.7**。CFG ≤ **7**。RescaleCFG = **0.6**
+- **Seedance**：`@video1` 真人動作參考。避免極端肢體描述。**禁用否定句**——Seedance 2.0 無 negative prompt 欄位（seedanceai.cc）
+
+:::note[📖]
+[ControlNet (ICCV 2023, §3.1–3.3)](https://arxiv.org/abs/2302.05543) · [RescaleCFG (WACV 2024, §3–4)](https://arxiv.org/abs/2305.08891)
+:::

@@ -1,0 +1,47 @@
+---
+title: 丟九宮格 storyboard 給 Seedance——它真的看得懂嗎？
+description: Seedance 2.0 內部有鏡頭分解（Shot Decomposition）步驟——解析 panel 序列、讀取文字標註、自動推斷運鏡
+sidebar:
+  order: 8
+---
+
+## 一句話
+
+Seedance 2.0 內部有鏡頭分解（Shot Decomposition）步驟——不是把 storyboard 當「一張圖」，而是先解析 panel 序列、讀取文字標註，再從 panel 之間的空間差異自動推斷運鏡和過渡。
+
+## 官方證據
+
+ByteDance 官方 launch 頁面（seed.bytedance.com）明確寫著：**"It can even directly reference text-based storyboards"**。官方 prompt 範例進一步列出具體提取的內容：「Refer to the shooting script in @Image 1, and draw on the storyboard, **shot scale, camera movement, visuals and copy** in @Image 1」——"copy" 就是 storyboard 上的文字標註。
+
+## 推論機制：四步驟
+
+**Step 1 — 影像理解層解析 storyboard**：分離每個 panel 的視覺特徵（構圖、角色位置、色調、光影）+ OCR/VLM 讀取 panel 上的文字標註（鏡位如 CU/WS、運鏡方向如 push-in/pan、時間點）+ 建立 panel 之間的空間關係與序列順序。
+
+**Step 2 — 鏡頭分解（Shot Decomposition）**：nemovideo.com 的 prompt 指南揭露了一個關鍵行為：「Seedance 2.0 doesn't process your prompt as one big block of text. **It reads your prompt and breaks it down into a sequence of distinct camera shots**——acting like a storyboard artist before generating a single frame。」每個 panel 對應一個 shot。
+
+**Step 3 — 與 Prompt 文字融合**：Prompt 中的時序描述（0-1 秒、1 秒開始）映射到對應 panel。沒有 prompt 文字時，模型從 panel 佈局自行推斷過渡方式和節奏。
+
+**Step 4 — DiT 去噪生成**：Cross-Attention 在每個 shot 段查閱對應 panel 的 K/V，Temporal Attention 平滑 shot 之間的過渡。
+
+## 為什麼只給 storyboard 就會產生運鏡變換？
+
+Panel 1 是 wide shot、panel 2 是 close-up——要從 panel 1 走到 panel 2，**中間唯一的連續路徑就是 push-in**。模型不是「被指定」做 push-in，而是 panel A 到 panel B 的空間差異本身就是 conditioning signal——運鏡是被推斷的，不是被指定的。nemovideo 的結論：「No camera line = the model decides. Sometimes it gets lucky. Most of the time, it doesn't.」
+
+## Storyboard vs. 純視覺風格參考（mood board）
+
+| | 純視覺風格參考（單張 mood board） | Storyboard（多格分鏡） |
+|---|---|---|
+| 模型看到的 | 一張圖的全局特徵 | 多格 panel 序列 + 文字標註 |
+| 提取的資訊 | 色調、光影、角色外觀 | 鏡位、運鏡方向、場景順序、copy 文字 |
+| 運鏡來源 | 預訓練先驗（Q14） | panel 間空間差異 → explicit conditioning |
+| 可控性 | 低（模型自行決定） | 中高（panel 提供 explicit shot plan） |
+
+:::caution[⚠️ 誠實揭露]
+Shot Decomposition 的內部步驟為基於 nemovideo.com 社群分析和產品行為的推論。Seedance 論文未描述 storyboard 的內部解析機制。
+:::
+
+:::note[📖]
+Seedance 2.0 Official Launch (seed.bytedance.com) — text-based storyboard 支援。
+
+nemovideo.com prompt 指南 — Shot Decomposition 行為描述。
+:::

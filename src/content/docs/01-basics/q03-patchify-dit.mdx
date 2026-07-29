@@ -1,0 +1,40 @@
+---
+title: 什麼是 Patchify（圖像區塊化）？
+description: 為什麼 DiT 架構讓舊 Prompt 技巧全部失效？理解 token 化與 Self-Attention 全局視野
+sidebar:
+  order: 3
+---
+
+## 一句話
+
+Transformer 讀不懂整張圖——切成 1024 塊 token 分批讀，再用 Attention 串回全局。
+
+## Patchify：把語意網格切成 token
+
+Q2 說模型在 64×64 語意網格上去噪。但 Transformer 看不懂整張圖——只能一小塊一小塊讀。
+
+**Patchify**：把 64×64 網格切成小方塊。2×2 一刀，得 32×32=**1024 塊**。每塊是一個 **token**——模型能理解的最小單位。每個 token 貼上**位置編碼（Positional Encoding）**，標記它在畫面的哪裡。
+
+## U-Net vs DiT：視野決定 Prompt 寫法
+
+切成 token 之後，**誰來處理這些 token**，決定了 Prompt 該怎麼寫：
+
+舊 Stable Diffusion 用 **U-Net（CNN）**——token 只看鄰居，視野窄。Prompt 技巧（堆關鍵字、加權括號）是為了在窄視野下強行引導模型。
+
+Seedance 2.0 用 **DiT（Diffusion Transformer）**——**Self-Attention 讓任意兩個 token 直接對話**，不管它們在畫面左上角還是右下角。視野全局，自然語言句子比關鍵字清單更有效。
+
+:::tip[🎬 導演要點]
+Seedance 2.0 不吃舊 SD 的 Prompt 語法。
+
+❌ 舊（U-Net）：`red dress, high quality, 8k, (detailed face:1.3)`
+
+✅ 新（DiT）：`「穿紅裙的女人站在窗邊，午後陽光從左側照進來」`
+
+**DiT 要場景描述，不要關鍵字清單。**
+:::
+
+:::note[📖 引用論文]
+[DiT (Peebles & Xie, ICCV 2023, §3–4)](https://arxiv.org/abs/2212.09748) — patchify 定義與 Self-Attention 全局視野。
+
+[Survey of Video Diffusion Models (Wang et al., TMLR 2025, §3.2)](https://arxiv.org/abs/2504.16081) — U-Net→DiT 演進。
+:::

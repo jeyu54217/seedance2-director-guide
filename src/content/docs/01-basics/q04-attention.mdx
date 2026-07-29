@@ -1,0 +1,50 @@
+---
+title: token 之間怎麼溝通？什麼是注意力機制（Attention）？
+description: Self-Attention、Cross-Attention、Temporal Attention 三種注意力，Cross-Attention 是導演操控模型的入口
+sidebar:
+  order: 4
+---
+
+## 一句話
+
+Attention 讓 token 互相對看、也看外部指令——Cross-Attention 是導演操控模型的入口。
+
+## 三種 Attention：Self、Cross、Temporal
+
+劇組比喻最直接：**Self-Attention** = 演員對戲（手和臉要協調）。**Cross-Attention** = 演員看導演指示（接收 Prompt、參考圖）。**Temporal Attention** = 前後幀對戲（第 1 秒和第 5 秒同一個角色）。
+
+| Attention 類型 | 白話 | 對導演來說 |
+|---|---|---|
+| **Self-Attention** | 畫面內 token 互相看 | 確保角色手臉協調，不分裂 |
+| **Cross-Attention** | token 看外部輸入 | **👈 操控入口。** `@image1` 在這裡建立參考點 |
+| **Temporal Attention** | 跨幀 token 互相看 | 第 1 秒和第 5 秒同一個角色 |
+
+## Cross-Attention：導演操控模型的入口
+
+Cross-Attention 是 token 接收外部指令的窗口——Prompt、參考圖、ControlNet 骨架全部從這裡注入。
+
+**參考圖為什麼會互相汙染？** `@image1`（紅衣）和 `@image2`（白衣）同時存在，Cross-Attention 沒正確隔離兩組 Key/Value → 紅色滲透到白色區。這就是**特徵污染（Feature Bleeding）**。解法：參考圖用純色背景的乾淨特寫。
+
+## Text Encoder：Prompt 怎麼被模型讀懂
+
+Prompt 是中文字，模型讀不了。需要 **Text Encoder（文字編碼器）** 轉成向量。最常用 **CLIP**——在數億組「圖片+文字」配對上訓練。三件事：
+
+1. CLIP 對視覺詞敏感、對抽象詞較弱——多給具體視覺線索。
+2. CLIP 有 **77 token 上限**——長 Prompt 會被截斷，關鍵詞放前面。
+3. Seedance 2.0 用更強的 T5-XXL，上下文更長。
+
+:::tip[🎬 導演要點]
+Cross-Attention 是操控入口——Prompt、@image1、ControlNet 全部走這條路。
+
+參考圖用純色背景。兩個以上參考圖，色系差異越大越好。
+
+Prompt 被 CLIP 編碼成向量，77 token 後截斷——關鍵資訊放前面。
+:::
+
+:::note[📖 引用論文]
+[DiT §3.1](https://arxiv.org/abs/2212.09748) — Self/Cross-Attention。
+
+[IP-Adapter (Ye et al., 2023, §3.2, §4)](https://arxiv.org/abs/2308.06721) — 解耦 Cross-Attention。
+
+[LDM §4.2](https://arxiv.org/abs/2112.10752) — CLIP Text Encoder。
+:::

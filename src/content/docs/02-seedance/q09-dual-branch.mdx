@@ -1,0 +1,75 @@
+---
+title: 為什麼 Seedance 2.0 可以一次生成帶聲音的影片？
+description: 雙分支架構（Dual-Branch DiT）讓畫面和聲音在同一個去噪過程中同步進化
+sidebar:
+  order: 1
+---
+
+## 一句話
+
+畫面去噪和聲音去噪，同一個過程、同一個時鐘、每一步互相傳訊號。
+
+傳統做法是兩個模型串聯——先生成靜音畫面，再事後配音。問題在於影片模型不知道後面會有聲音，音效模型只能看著已生好的畫面「猜」時間點。唇形在第 47 幀動、聲音在第 50 幀才觸發——差三幀就出戲。
+
+Seedance 2.0 的做法：[Seedance 1.5 Pro (§3)](https://arxiv.org/abs/2512.13507) 把 DiT 骨幹拆成 **Visual Branch（畫面去噪）** 和 **Audio Branch（聲音去噪）**——兩條平行線，但共用同一個去噪排程。論文稱之為「原生音視頻聯合生成（Native Audio-Visual Joint Generation）」。
+
+## 第一步：兩個分支，一個時鐘
+
+```
+Step t = 999:  [Visual: 全是雜訊]        [Audio: 全是雜訊]
+                        ↕  Cross-Modal Joint Module
+Step t = 998:  [Visual: 浮現輪廓]          [Audio: 浮現背景音]
+                        ↕
+...
+Step t = 0:    [Visual: 乾淨畫面]          [Audio: 對白+音效+BGM，三軌獨立]
+```
+
+關鍵是：兩個分支的 t 永遠同步。每一步去噪，視覺 latent 和音訊 latent 都透過 **Cross-Modal Joint Module（跨模態聯合模組）** 交換當前的狀態。不是「先生成畫再生成音」，是「每一步畫和音一起進化」。
+
+## 第二步：雙向資訊流
+
+**音 → 畫**：音訊分支把語音的**音素時間點（phoneme timing）**——哪個音在什麼時候發出——傳給畫面分支。/p/ 音（雙唇爆破）→ 對應幀嘴唇區域 latent 調整：雙唇閉合、爆破張開。Seedance 1.5 Pro 論文揭露了雙分支架構，但 phoneme 級別的同步細節未在論文中展開。產品文檔（seedance.tv）實測數據：乾淨錄音唇形延遲 40–80ms，嘈雜錄音 120–200ms。社群最佳實踐：10s 內 ≤12 詞，句子間加停頓標記作重同步錨點。
+
+**畫 → 音**：畫面分支在產生碰撞（杯子落地、腳步著地）時，在對應幀的 latent 中留下特徵變化。Joint Module 把事件訊號傳給音訊分支，觸發 Foley 音效。重點：不是從音效庫選一個播放——是根據碰撞強度、材質、空間距離**從零合成**。「靴子踩濕鵝卵石」和「球鞋踩硬木地板」產出完全不同的腳步聲。
+
+## Prompt 中的對白文字怎麼變成語音？
+
+到這裡，你可能注意到一個缺口：雙分支架構解釋了音和畫怎麼同步，但「對白文字本身怎麼變成聲音」——Seedance 論文**沒有描述**。以下是基於產品行為和學術界相近研究的推論。
+
+### 產品行為：雙引號 = 觸發 TTS
+
+從社群實測和平台文檔（seedance.tv、opusly.ai、replicate、fal.ai）可以確認：Seedance 2.0 把 prompt 中雙引號 `"..."` 內的文字標記為 **spoken dialogue**，路由到 Audio Branch 生成對應語音。雙引號外的文字則作為場景描述，路由到 Video Branch。角色的**聲線（音色、年齡、性別、口音）** 由 prompt 中的角色描述推斷——例如「画家莫奈」→ 年長男性、沉穩語調。上傳的音訊檔案（@Audio1）是**節奏和語調的參考**，不是語音克隆來源。
+
+### 學術界相近做法（非 Seedance 官方）
+
+目前最接近的學術論文是 [OmniTalker（Wang et al., NeurIPS 2025）](https://arxiv.org/abs/2504.02433)——同樣採用 dual-branch DiT 架構，從文字同時生成語音和說話人臉。其 Audio Branch 的內部流程為：**text encoder → duration predictor（預測每個音素的持續時間）→ mel-spectrogram diffusion（去噪生成頻譜）→ vocoder（頻譜轉波形）**。淺層 DiT block 中的 cross-modal fusion 確保 phoneme 級別的唇形同步。[Talker-T2AV（2026）](https://arxiv.org/abs/2604.23586) 則指出 pervasive cross-modal attention 對 talking head 是次優的——語音和臉部在高層語意上相關，但低層信號（波形 vs. 像素紋理）的生成路徑應該分開。Seedance 2.0 實際採用哪種策略，官方未揭露。
+
+:::caution[⚠️ 誠實揭露]
+以上 TTS 內部流程的描述來自 OmniTalker（阿里巴巴）論文，非 Seedance 官方。Seedance 1.5 Pro 和 2.0 Model Card 均未描述 Audio Branch 內部的 TTS 實現細節。聲線推斷的行為來自社群實測和平台文檔。
+:::
+
+## 第三步：音訊分支內部——三條獨立音軌 + 空間定位
+
+音訊分支不是生出一條混合音軌。它在潛在空間中平行解算三條獨立軌道：
+
+- **對白/配音**：和畫面分支唇形特徵雙向對齊
+- **環境音（Ambience）**：根據畫面場景自動生成——雨景有雨聲、森林有鳥鳴
+- **背景音樂（BGM）**：根據 Prompt 情緒和場景風格生成
+
+最後透過**雙耳立體聲編碼（Binaural Audio Encoding）**，結合畫面 3D 空間資訊（角色距離、左右位置），自動計算 **ITD（雙耳時間差）** 和 **ILD（雙耳聲級差）**——你戴耳機聽，聲音有方向感。
+
+:::tip[🎬 導演要點]
+- **ComfyUI 無法重現原生雙分支去噪**——這是訓練階段嵌入權重的機制，推理端只能走級聯（靜音影片 → 外掛 MMAudio/AudioLDM），同步精度有落差
+- 對白場景控制在 10 秒內、12–20 個詞；句子間加停頓標記作為重同步錨點
+- 多人對白和複雜音效疊加仍是開放問題——論文也承認
+:::
+
+:::note[📖 引用論文]
+[Seedance 1.5 Pro §3–4](https://arxiv.org/abs/2512.13507) — 雙分支 DiT、Cross-Modal Joint Module 原始設計。
+
+[Seedance 2.0 Model Card §1–2](https://arxiv.org/abs/2604.14148) — 雙耳音訊、多軌輸出（對白/環境音/BGM）、音畫同步評測。
+
+[OmniTalker (NeurIPS 2025)](https://arxiv.org/abs/2504.02433) — dual-branch DiT 做 text→speech+talking face 的學術參考（非 Seedance）。
+
+[Talker-T2AV (2026)](https://arxiv.org/abs/2604.23586) — 指出 pervasive cross-modal attention 對 talking head 為次優。
+:::

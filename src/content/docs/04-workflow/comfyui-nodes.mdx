@@ -1,0 +1,16 @@
+---
+title: ComfyUI 節點速查
+description: Seedance 2.0 相關 ComfyUI 節點組合與關鍵參數一覽
+sidebar:
+  order: 1
+---
+
+| 控制維度 | 節點組合 | 關鍵參數 |
+|---|---|---|
+| 角色面部鎖定 | `IP-Adapter FaceID Plus V2` + `FaceDetailer` | weight **0.8–0.9**；FaceDetailer denoise **0.2–0.35** |
+| 肢體動作控制 | `DWPose` + `Depth Anything V2`（雙重 ControlNet） | strength **0.5–0.6**；start=**0.0**, end=**0.7**；CFG ≤ **7**；RescaleCFG **0.6** |
+| 空間深度控制 | `Depth Anything V2` + `ZoeDepth` | 複雜場景疊加 Tile ControlNet |
+| 運鏡控制 | `CameraCtrl` + `FreeInit` + `Tile ControlNet` | FreeInit 預設參數（filter_type=gaussian）；Euler sampler，Steps ≥ 25 |
+| 區域隔離（多人） | `Regional Prompting` + SAM + `Multiple IP-Adapters` | 每個 IP-Adapter 只綁定對應 SAM mask 區域；≤ 2 角色最佳 |
+| 防潰爛（基礎） | `RescaleCFG` + `FreeInit` | RescaleCFG **0.5–0.7**；CFG ≤ 7 |
+| 畫質提升 | `Ultimate SD Upscale` / `RealESRGAN` | 720p → 1080p/4K；不是原生解析度的替代方案 |

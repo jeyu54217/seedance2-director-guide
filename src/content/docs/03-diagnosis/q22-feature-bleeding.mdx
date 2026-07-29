@@ -1,0 +1,19 @@
+---
+title: 多角色特徵污染（Feature Bleeding）
+description: Dynamic Weight Masking 依賴模型特徵解耦能力——角色視覺特徵太接近導致解耦失敗
+sidebar:
+  order: 4
+---
+
+## 🔍 根因
+
+Dynamic Weight Masking（Q10）的遮罩 A=Softmax(QKᵀ/√dk+M) 依賴模型特徵解耦能力。角色視覺特徵太接近（同色系、同髮色）→ 解耦失敗。MindStudio 測試：Identity Slot 上限 ~2 角色。
+
+## 🛠️ 解法
+
+- **ComfyUI**：Regional Prompting + SAM 預分割，每個 IP-Adapter 只綁定對應 mask 區域
+- **Seedance**：角色色系差異最大化（紅 vs 藍 >> 紅 vs 橘）。純色背景特寫。**≤2 角色**
+
+:::note[📖]
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) · [IP-Adapter §4](https://arxiv.org/abs/2308.06721)
+:::

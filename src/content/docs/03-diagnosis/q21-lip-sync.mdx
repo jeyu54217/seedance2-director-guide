@@ -1,0 +1,21 @@
+---
+title: 口型對不上語音
+description: Seedance 以 Prompt 對白文字為唇形 source of truth，上傳音訊僅作語音風格參考
+sidebar:
+  order: 3
+---
+
+## 🔍 根因
+
+Q9 的雙分支架構特性：**Seedance 以 Prompt 對白文字為唇形 source of truth，上傳音訊僅作語音風格參考**（Reddit r/generativeAI）。crepal.ai 實測：乾淨錄音唇形延遲 40–80ms，嘈雜錄音 120–200ms。
+
+## 🛠️ 解法
+
+- 對白 ≤12 詞/10s，≤20 詞/15s（ugccopilot.ai）
+- 精確時間標籤 `[00:01-00:03]`；句子間加微停頓標記作重同步錨點
+- 先用 ElevenLabs/Hume 生成乾淨音檔再 @Audio1 上傳
+- 減少頭部運動 Prompt（seedance.tv）。ComfyUI 無法修復（Q9）
+
+:::note[📖]
+[Seedance 1.5 Pro §3](https://arxiv.org/abs/2512.13507) · [Seedance 2.0 Model Card §2](https://arxiv.org/abs/2604.14148) · [OmniTalker (NeurIPS 2025)](https://arxiv.org/abs/2504.02433) — joint speech+talking face 的學術參考
+:::

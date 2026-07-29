@@ -1,0 +1,38 @@
+---
+title: 為什麼 Seedance 2.0 最長只能生 15 秒？
+description: Self-Attention 的 O(n²) 瓶頸——token 數量越多，運算量平方成長。以及 Seedance 2.5 的稀疏注意力突破
+sidebar:
+  order: 5
+---
+
+## 一句話
+
+瓶頸出在 Self-Attention 的 **O(n²) 運算複雜度**。token 數量越多，運算量平方成長。**長度變 2 倍 → 計算量變 4 倍**。
+
+論文直接佐證：Wan2.1 1.3B 中 self-attention 佔 transformer block 總運算的 **76%**（[Attention Surgery, arXiv:2509.24899, §1](https://arxiv.org/abs/2509.24899)）。Mochi-1 10B 中佔約 **60%**（[Analysis of Attention in VDiTs, arXiv:2504.10317, §1](https://arxiv.org/abs/2504.10317)）。
+
+粗估 token 量級（未在論文中，僅供參考）：5 秒 720p ≈ 10 萬 token，15 秒 ≈ 30–45 萬，30 秒 ≈ 60–90 萬。
+
+## Seedance 2.0：上限 15 秒，以上靠拼接
+
+Seedance 2.0 Model Card 原生支援 4–15 秒。超過 15 秒靠社群 workaround——生成多段短片段再接起來，但接縫處角色漂移、光線不一致、動作不連續。論文本身未對此提供解決方案。
+
+## Seedance 2.5：Sparse Attention 突破 30 秒
+
+2026 年 6 月發表的 Seedance 2.5 原生生成 30 秒 4K 影片，不靠拼接。技術方向是**稀疏注意力（Sparse Attention）**——不讓每個 token 跟所有 token 互動，只跟有意義的鄰居互動，複雜度從 O(n²) 壓到接近 O(n log n)。學術上稀疏 attention 有多個方向——VMonarch（CVPR 2026）、FreqFormer（arXiv:2604.22808）——Seedance 2.5 是第一個在產品級模型上實現的。（註：2.5 尚未發布技術論文，產品頁面未揭露內部架構細節。）
+
+:::tip[🎬 導演要點]
+15 秒和 30 秒不是同一個量級的任務。Seedance 2.0 拍片，每個鏡頭控制在 8–12 秒內品質最穩定。
+
+超過 15 秒 → 要嘛接受拼接的品質損失，要嘛等 2.5。
+
+生成時間成本不是線性的——10 秒可能 2 分鐘、15 秒 5 分鐘、20 秒可能爆 VRAM。排拍攝時程要把非線性算進去。
+:::
+
+:::note[📖 引用論文]
+[Attention Surgery (arXiv:2509.24899, §1)](https://arxiv.org/abs/2509.24899) — Wan2.1 中 self-attention 佔 76% 運算。
+
+[Analysis of Attention in VDiTs (arXiv:2504.10317, §1)](https://arxiv.org/abs/2504.10317) — Mochi-1 中佔 60%。
+
+[Efficient Video Diffusion Survey (Shao et al., §3)](https://arxiv.org/abs/2604.15911) — 稀疏 attention、量化、快取的系統性綜述。
+:::

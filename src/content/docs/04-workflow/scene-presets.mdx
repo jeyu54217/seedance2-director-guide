@@ -1,0 +1,13 @@
+---
+title: 四種短劇場景標準組合
+description: 對白近景、打鬥動作、大運鏡、多角色——ComfyUI 與 Seedance Prompt 完整參數
+sidebar:
+  order: 2
+---
+
+| 場景 | ComfyUI | Seedance Prompt | 關鍵數字 |
+|---|---|---|---|
+| **對白近景** | `IP-Adapter FaceID`(0.85) + `DWPose Face` + `RescaleCFG`(0.6) | `@image1`（高清正面頭像）+ `[00:01-00:03]` 時間標籤 | ≤12詞/10s；≤20詞/15s；句子間加停頓錨點 |
+| **打鬥／動作** | `DWPose Full` + `Depth V2`（雙 ControlNet, str=0.55, end=0.7） + `RescaleCFG`(0.6) | `@video1`（真人動作參考） | CFG ≤ 7；禁用否定句 |
+| **大運鏡** | `CameraCtrl` + `FreeInit` + `Tile ControlNet` + Euler sampler | `@image1` + `@video1`（運鏡軌跡） | Steps ≥ 25；FreeInit 預設參數 |
+| **多角色** | `Regional Prompting` + SAM mask + 每個角色獨立 `IP-Adapter` | `@image1` + `@image2` 色系差異最大化 | ≤2 角色；純色背景特寫 |

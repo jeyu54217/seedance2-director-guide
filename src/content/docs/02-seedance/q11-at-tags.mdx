@@ -1,0 +1,37 @@
+---
+title: "@image1、@video1 這些標籤怎麼運作？"
+description: "@ 標籤不是文字替換，是 embedding slot——直接把視覺特徵灌進 Cross-Attention"
+sidebar:
+  order: 3
+---
+
+## 一句話
+
+@ 標籤不是文字替換，是一個 embedding slot，直接把視覺特徵灌進 Cross-Attention。
+
+純文字 Prompt「一個穿紅衣服的女人」要走兩步：文字 → CLIP text encoder → 語意向量 → Cross-Attention 映射視覺。每一步都有資訊損耗。@ 標籤跳過這個轉譯過程——直接把參考圖的視覺特徵當作 token 餵進去。
+
+## 底層怎麼運作？
+
+當 Prompt 出現 `@image1`，模型在注意力機制中分配一個**模態位置編碼（Modality-Specific Position Embedding）**——一個實際的 embedding slot，模型在訓練中學會了「這個位置的 token 對應到視覺參考編碼器的輸出」。然後 Cross-Attention 把生成畫面的 Query 精確路由到這張參考圖的 Key/Value 矩陣：
+
+```
+生成畫面 patches 的 Query ──→ @image1 的 K/V（角色面部特徵）
+                           ──→ @image2 的 K/V（服裝質感特徵）
+                           ──→ @video1 的 K/V（運鏡軌跡特徵）
+```
+
+這讓複合指令變得可行：`"@image1 的角色穿著 @image2 的衣服，按 @video1 的運鏡方式走動"`——三個參考來源同時查詢，Q10 的 Dynamic Weight Masking 負責隔離。
+
+:::tip[🎬 導演要點]
+- @ 標籤像導演直接給演員看照片，而非口頭描述長相——跳過文字轉譯，訊號更直接
+- 參考圖要乾淨（純色背景）——背景凌亂 = Identity Embedding 混進雜訊，跟著 @ 標籤一起注入畫面
+- 多素材時風格和顏色差距越大越好——紅+藍容易隔離，紅+橘 mask 很吃力
+- 複合指令明確指定哪個 @ 做什麼，不要讓模型自己猜
+:::
+
+:::note[📖 引用論文]
+@ 標籤底層機制為社群從產品行為推論，Seedance 2.0 Model Card 未描述內部實作。
+
+[Controllable Video Survey (Ma et al., §4.2)](https://arxiv.org/abs/2507.16869) — 控制信號注入 DiT 的綜述。
+:::

@@ -1,0 +1,18 @@
+---
+title: 光源改變面部 + 音軌汙染 + 人臉阻擋
+description: 三個常見環境問題的根因與解法
+sidebar:
+  order: 7
+---
+
+## 光源改變面部
+
+暗場景 Attention 對陰影區 visible features 減少（Q4）。解法：多光照參考圖（`@image1` 亮 + `@image2` 暗），或亮光生成後製調暗。
+
+## 音軌汙染
+
+Seedance Audio Stream 優先採用影片內嵌音軌（Q9–Q10）。解法：上傳前將參考影片靜音。
+
+## 人臉阻擋
+
+2026/02 MPA 事件後的 safety filter。社群：網格覆蓋法、AI 虛擬角色臉。根本方案：改用 Kling 3.0。

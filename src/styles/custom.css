@@ -1,0 +1,40 @@
+/* Seedance 2.0 Director Guide — Custom Theme */
+/* Override Starlight CSS variables with original design palette */
+
+:root {
+  /* Accent — warm terracotta replacing Starlight blue */
+  --sl-color-accent-low: #fdf0e8;
+  --sl-color-accent: #c44f1c;
+  --sl-color-accent-high: #a03d10;
+
+  /* Background — warm paper tone */
+  --sl-color-bg-nav: #faf9f6;
+  --sl-color-bg-sidebar: #faf9f6;
+  --sl-color-bg: #faf9f6;
+
+  /* Text */
+  --sl-color-text: #1a1a1a;
+  --sl-color-text-accent: #c44f1c;
+
+  /* Code */
+  --sl-color-bg-inline-code: #f4f0eb;
+
+  /* Typography */
+  --sl-font: 'Noto Sans TC', 'PingFang TC', 'Noto Sans SC', 'Microsoft JhengHei', -apple-system, sans-serif;
+  --sl-font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* Dark mode overrides */
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #3d1a0a;
+  --sl-color-accent: #e07b4a;
+  --sl-color-accent-high: #fdf0e8;
+
+  --sl-color-bg-nav: #1a1a1a;
+  --sl-color-bg-sidebar: #1a1a1a;
+  --sl-color-bg: #1e1e1e;
+
+  --sl-color-text: #e8e8e8;
+
+  --sl-color-bg-inline-code: #2a2a2a;
+}

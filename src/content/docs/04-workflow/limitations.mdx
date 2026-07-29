@@ -1,0 +1,17 @@
+---
+title: Seedance 2.0 的關鍵限制
+description: 無 LoRA、傾向 generic realism、原生雙分支音畫無法在 ComfyUI 重現、物理不穩健等限制
+sidebar:
+  order: 3
+---
+
+| 限制 | 替代方案 |
+|---|---|
+| **無 LoRA 支援** | 多張高品質參考圖 + IP-Adapter 補強；等 Seedance 2.5 |
+| **傾向 generic realism** | ComfyUI 後製 style transfer；或 Wan 2.6（開源、有 LoRA） |
+| **原生雙分支音畫無法在 ComfyUI 重現** | 級聯：影片 → MMAudio/AudioLDM 生成音效 |
+| **物理理解不穩健** | 複雜場景用 ControlNet + Depth 雙重約束（分級策略見 Q24） |
+| **原生解析度 480p/720p** | Standard 方案 1080p；或 720p → Topaz/RealESRGAN 升頻 |
+| **最長 15 秒，O(n²) 瓶頸** | 每個鏡頭 8–12s 最穩；長片用拼接或等 Seedance 2.5 |
+| **版權過濾（face detection）** | 原創角色；極端情況改用 Kling 3.0 |
+| **Sora 2 已停止服務** | 2026/04/26 關閉 web/app，API 09/24 關閉。不要依賴 |

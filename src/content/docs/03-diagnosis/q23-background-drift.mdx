@@ -1,0 +1,19 @@
+---
+title: 大運鏡背景漂移
+description: 鏡頭快速移動時 Temporal Attention 窗口不夠大或位置編碼未捕捉大位移
+sidebar:
+  order: 5
+---
+
+## 🔍 根因
+
+鏡頭快速移動時，Temporal Attention（Q4）窗口不夠大或位置編碼（Q6）未捕捉大位移 → 背景 patch 跟丟。
+
+## 🛠️ 解法
+
+- **ComfyUI**：CameraCtrl + FreeInit（預設參數）+ Tile ControlNet 三連。Euler sampler，Steps ≥ 25
+- **Seedance**：`@video1` 運鏡軌跡參考
+
+:::note[📖]
+[Controllable Video Survey §4.2](https://arxiv.org/abs/2507.16869)
+:::
