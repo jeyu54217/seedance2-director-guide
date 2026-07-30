@@ -21,9 +21,25 @@ Self-Attention 可以在 token 之間建立關聯，但它學到的是「這個�
 
 [Q2：潛在空間](../01-basics/q02-latent-space/) 的感知壓縮（f=8）把「肉眼不可察的高頻細節抽象掉」——這對自然場景是好事（去掉不必要的表面雜訊），但對文字是災難。文字的邊緣銳利度、筆畫粗細變化、襯線細節——全部落在 VAE 認定為「高頻、可拋棄」的頻率範圍。壓縮後，文字區域在 latent space 中變成模糊的色塊，Decoder 還原時只能「猜」出類似文字的形狀——結果就是亂碼。
 
-## 不是 Seedance 的 bug，是 DiT 的限制
+## 不是 Seedance 的 bug，是架構選擇的結果
 
-所有基於 DiT 的 video model（Sora 2、Kling 3.0、Veo 3.1）都有相同的問題——[Q3](../01-basics/q03-patchify-dit/) 揭示的 DiT 本質：patch-based tokenization + VAE latent compression = 缺乏 glyph-level 表徵。這不是 bug，是目前架構設計取捨的必然結果。
+[Q3](../01-basics/q03-patchify-dit/) 揭示的 DiT 本質：patch-based tokenization + VAE latent compression = 缺乏 glyph-level 表徵。2026 年多家獨立評測一致確認：Seedance 2.0 文字輸出仍是亂碼，Kling 3.0 相對較好但仍不穩定，Veo 3.1 文字在幀間漂移模糊。這是架構設計取捨的必然結果，不是 bug——所有 DiT-based video model 共享此限制。
+
+### ChatGPT Images 做得到，為什麼 Seedance 不行？
+
+ChatGPT Images（GPT-4o 原生影像，2026 年 4 月升級至 Images 2.0）採用 **autoregressive（自回歸，AR）架構**，不是 diffusion。
+
+兩者的根本差異：
+
+| | Diffusion（Seedance 2.0） | Autoregressive（ChatGPT Images） |
+|---|---|---|
+| 生成方式 | 從隨機噪聲迭代去噪 | 左到右、上到下，逐 token 預測 |
+| 文字如何處理 | 視覺紋理——跟樹葉、皮膚沒兩樣 | 語意 token——模型知道「這是一個字元」 |
+| 對文字的理解 | 無 glyph-level 表徵 | 字元級語意理解，與文字生成共享 transformer |
+
+Diffusion 模型中，文字只是另一種要去噪的視覺圖案。AR 模型中，文字 token 和影像 token 走同一個 transformer 骨幹——模型生成「E」「X」「I」「T」四個 token 時，知道它們組成一個英文字，不是四坨隨機紋理。
+
+這是架構層級的根本差異。Seedance 2.0 不可能透過更多訓練資料或參數調整達到 ChatGPT Images 的文字渲染水準——需要完全不同的模型架構。
 
 [Q17：Storyboard 實戰](../02-seedance/q17-storyboard-practice/) 的「文字滲入 bug」（storyboard 上的文字標註跑到輸出畫面）是同一個問題的反面——模型無法區分「應該渲染的文字」和「應該忽略的標註」。
 
@@ -49,4 +65,8 @@ Self-Attention 可以在 token 之間建立關聯，但它學到的是「這個�
 [LDM (Rombach et al., CVPR 2022, §3)](https://arxiv.org/abs/2112.10752) — VAE 感知壓縮 f=8。
 
 [Survey of Video Diffusion Models (TMLR 2025, §3.2)](https://arxiv.org/abs/2504.16081) — DiT 架構限制綜述。
+
+[GPT-ImgEval (Zhang et al., 2025, §4)](https://arxiv.org/abs/2504.02782) — 實證分析 GPT-4o 採用 AR + diffusion decoder 混合架構。
+
+[Introducing 4o Image Generation (OpenAI, 2025.3)](https://openai.com/index/introducing-4o-image-generation/) — GPT-4o 原生影像生成技術說明。
 :::

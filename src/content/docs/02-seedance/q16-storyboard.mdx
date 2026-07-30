@@ -1,43 +1,49 @@
 ---
 title: 丟九宮格 storyboard 給 Seedance——它真的看得懂嗎？
-description: Vision encoder 整張編碼、文字可能被讀取也可能滲入、prompt 負責串接 panel 之間的敘事邏輯
+description: 模型把整張 storyboard 當成一張圖處理，靠 prompt 來理解 panel 之間的關係，文字標註會被讀取但可能滲入畫面
 sidebar:
   order: 8
 ---
 
 ## 一句話
 
-Seedance 把整張 storyboard 當成一張圖編碼，靠 prompt 理解 panel 之間的敘事關係；文字標註會被讀取，但同時留在視覺特徵中，可能滲入輸出畫面。
+Storyboard 就是一張圖——模型沒有把它切成九張獨立的 panel，而是靠 prompt 來理解每一格之間的關係，文字標註會被讀取，但因為文字同時也是畫面上的圖案，所以可能滲入輸出。
 
 ## 一張圖為什麼能產生多個鏡頭
 
-單張 mood board 只有一組顏色、光影、構圖——model 在每一幀看到的是同一個條件。但 storyboard 的 grid 佈局本身就帶有空間變化：panel 1 是 wide shot，panel 2 是 close-up，panel 3 是低角度。Vision encoder 輸出的 feature map 保留了這個空間結構——不同 spatial position 帶著不同 panel 的視覺特徵。
+單張 mood board 只有一組畫面資訊：整張圖的顏色、光影、構圖。模型生成每一幀時，參考的都是同一個訊號。
 
-Model 在訓練中學到一件事：條件訊號在空間上有結構性變化 → 時間上應該產生 shot 變化。Storyboard 和 mood board 走同一條編碼路徑，差別在於 storyboard 的 feature map 自帶空間差異，mood board 沒有。
+但 storyboard 不同。九宮格裡每一格畫的是不同的鏡位——左上是 wide shot，右上是 close-up，左下是低角度。模型處理圖片時，會保留「哪個位置有什麼內容」的空間資訊——它知道左上方的畫面和右下方的畫面不一樣。
 
-## 模型實際看到的是什麼
+模型在大量訓練中學到一件事：參考圖的不同位置有明顯不同的畫面內容 → 生成的影片應該要有鏡頭切換。mood board 沒有這種空間差異，所以只會生出單一鏡頭。storyboard 有，所以會生出多個鏡頭。
 
-整張圖，沒有 panel 分割。Vision encoder 的 feature map 中，左上方 token 對應 panel 1 的構圖，右上方對應 panel 2，依此類推。grid 的排列規律被 encoder 理解為空間結構——和它理解「照片裡有兩個人」是同一種能力。
+## 模型到底看到了什麼
 
-Panel 上的文字標註（"CU"、"push-in"、"0-3s"）**會被讀取**——oimi.ai 的案例中，storyboard 上的運鏡註釋確實影響了輸出。但讀取的機制未知：可能是 vision encoder 內建的識字能力，也可能是 ByteDance 的 Seed-VL 家族做前處理。無論哪種，文字同時留在 visual feature 中沒有被移除——這是文字滲入 bug 的根源（OpenArt Handbook：需手動加 "no text overlay on screen"）。
+整張圖，沒有被切開。模型處理時保留了空間位置——左上角的像素對應 panel 1，右上角對應 panel 2。就像它能分辨「照片左邊有個人、右邊有棵樹」，它也能分辨「storyboard 左上是 wide shot、右上是 close-up」。
 
-## 鏡頭序列是怎麼生成的
+Storyboard 上的文字（"CU"、"push-in"、"0-3s"）**會被讀取**。oimi.ai 的實測證明了：在 storyboard 上標註運鏡方向和時間點，確實會影響輸出結果。但文字同時以「圖案」的形式留在畫面資訊中——所以有時候文字會直接出現在生成的影片裡。這就是 OpenArt Handbook 提到的 bug：storyboard 上的標註可能滲入畫面，需要手動加 "no text overlay on screen" 來防止。
 
-Vision encoder 負責「這張圖長怎樣」——空間結構、panel 內容、文字。但它不負責「panel 1 和 panel 2 之間是什麼關係」。這個關係來自 prompt。OpenArt Handbook 明確要求使用者 "describe the narrative logic between panels in your prompt"——model 不會自己推斷為什麼 wide shot 後面接 close-up。
+文字是怎麼被讀取的，目前不清楚——可能是模型自己看圖認字，也可能內部有獨立的 OCR 步驟。兩種都有可能，現有的證據無法判斷。
 
-Prompt 中的敘事描述引導 cross-attention 在不同時間段關注 feature map 的不同空間區域：[Q4：Temporal Attention](../q04-spatial-temporal/) 在時間軸上平滑這些 attention focus 之間的過渡，[Q14：預訓練視覺先驗](../q14-camera-motion/) 補出具體的運鏡方式。
+## 鏡頭之間的關係是 prompt 決定的
 
-這個機制的副產品是：panel 越多，每格在 feature map 中佔的空間越小，attention 越難區分不同 panel。這就是為什麼社群共識是 **≤4 格（2×2）效果最好**。
+模型知道這張圖長怎樣——空間結構、每格內容、文字標註。但它不知道 panel 之間是什麼關係。為什麼 wide shot 後面接 close-up？panel 1 到 panel 2 是 push-in 還是 jump cut？這些不是從圖上能判斷的。
+
+**這些關係來自 prompt。** OpenArt Handbook 明確說：你必須在 prompt 中描述 panel 之間的敘事邏輯，模型不會自己推斷。
+
+Prompt 告訴模型「panel 1→panel 2 之間做 push-in」，模型在生成前段時參考圖的左上區域，生成後段時參考圖的右上區域。兩個區域之間的過渡怎麼補，靠 Temporal Attention（[Q4](../q04-spatial-temporal/)）在時間軸上做平滑，以及預訓練先驗（[Q14](../q14-camera-motion/)）——模型在訓練中看過大量 wide shot→close-up 的影片，知道中間應該長什麼樣子。
+
+這個機制的副產品是：panel 越多，每格佔的空間越小，模型越難區分不同格。社群共識是 **≤4 格（2×2）效果最好**。
 
 :::tip[🎬 導演要點]
-- **≤4 panel 最穩**——格數越多 attention 越稀釋
-- **角色參考圖和 storyboard 分開上傳**——同一角色在不同 panel 畫得稍有不同，model 可能當成不同的人
-- **文字標註寫在 prompt 裡，不要寫在 storyboard 上**
+- **≤4 panel 最穩**——格數越多，每格畫面越小，模型越難分辨
+- **角色參考圖和 storyboard 分開上傳**——同一角色在不同 panel 畫得稍有不同，模型可能當成不同的人
+- **文字標註寫在 prompt 裡，不要寫在 storyboard 上**——寫在圖上的字可能跑到影片裡
 - 完整實戰流程見 [Q17：Storyboard 實戰](../q17-storyboard-practice/)
 :::
 
 :::caution[⚠️ 誠實揭露]
-Seedance 論文未描述 storyboard 內部機制。以上為從社群行為反推的推論，非官方確認。文字讀取的具體機制（vision encoder 內建 vs 專用 VLM/OCR）無法從現有證據判斷。
+Seedance 論文未描述 storyboard 內部機制。以上為從社群行為反推的推論，非官方確認。
 :::
 
 :::note[📖 引用論文]

@@ -15,7 +15,7 @@ sidebar:
 
 **高速運動時，同一個物體在相鄰幀之間的位移過大**——位置編碼的餘弦相似度驟降到匹配閾值以下。Temporal Attention 判定「這兩個 token 不是同一個東西」→ token tracker 跟丟 → 物體從這一幀開始「消失」或「變形」。
 
-這跟 [Q20：肢體融化](q20-limb-melting/)（SNR 崩潰把肢體當雜訊砍）和 [Q24：物理失敗](q24-physics-failure/)（Physics Reward 的表面模擬）不同——這是 **token 追蹤層面的失敗**。消失的物體不是「物理上不合理地漂浮」，而是「模型的 attention tracker 直接失去了對這個物體的追蹤」。
+這跟 [Q24：肢體融化](q24-limb-melting/)（SNR 崩潰把肢體當雜訊砍）和 [Q27：物理失敗](q27-physics-failure/)（Physics Reward 的表面模擬）不同——這是 **token 追蹤層面的失敗**。消失的物體不是「物理上不合理地漂浮」，而是「模型的 attention tracker 直接失去了對這個物體的追蹤」。
 
 ## O(n²) 截斷讓高速場景更脆弱
 
@@ -29,7 +29,7 @@ sidebar:
 - **慢速 dolly-in 代替快速 zoom**：同樣是靠近主體，dolly-in（物理移動攝影機）在幀間位移分佈均勻，zoom（改變焦距）造成邊緣區域的非線性位移
 - 避免快速變焦和快速 whip pan——這些運鏡在訓練數據中本來就稀少
 - 在 prompt 中指定「slow, continuous movement, consistent speed」——不要只描述動作內容，也要描述動作速度
-- [Q23：背景漂移](q23-background-drift/) 的解法也適用：CameraCtrl + FreeInit + Tile ControlNet 三連提供 explicit 空間約束
+- [Q30：背景漂移](q30-background-drift/) 的解法也適用：CameraCtrl + FreeInit + Tile ControlNet 三連提供 explicit 空間約束
 
 :::tip[🎬 導演要點]
 
