@@ -9,19 +9,19 @@ sidebar:
 
 [Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 窗口在高運動幅度時失效——[Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) 瓶頸迫使實際部署截斷窗口，大位移超出 [Q6：時間步調節](../01-basics/q06-timestep/) 位置編碼的捕捉範圍，背景 patch 跟丟。
 
-## WHY：Temporal Attention 的窗口為什麼不夠大？
+## Temporal Attention 的窗口為什麼不夠大？
 
 [Q4：注意力機制](../01-basics/q04-attention/) 定義 Temporal Attention 為「跨幀 token 互相看」——第 1 幀的背景 token 和第 5 幀的背景 token 透過 Attention 匹配，確保同一個背景區域在時間軸上一致。
 
 匹配的數學基礎是 [Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼（空間+時間）——兩個 token 的餘弦相似度決定它們是否「是同一個東西」。問題：位置編碼的餘弦相似度在**小位移時靈敏、大位移時驟降**。快速運鏡（whip pan、快速 dolly）→ 相鄰幀之間同一個背景物體的位移過大 → 相似度低於匹配閾值 → Temporal Attention 判定「這兩個 token 不是同一個東西」→ 背景從這一幀開始「跟丟」。
 
-## WHAT：O(n²) 讓問題更嚴重
+## O(n²) 讓問題更嚴重
 
 [Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 揭露了根本的運算瓶頸：Self-Attention 佔 DiT 運算的 76%（Wan2.1）到 60%（Mochi-1）。在實際部署中，Temporal Attention 的窗口不是無限大的——為了控制 O(n²) 運算量，窗口被截斷為有限幀數範圍。快速運鏡時，背景物體在幾幀之內就移出截斷窗口——Temporal Attention 連「試圖匹配」的機會都沒有。
 
 [Q14：運鏡機制](../02-seedance/q14-camera-motion/) 的四層運鏡分析也提供反面證據：Temporal Attention 在**慢速運鏡**時表現良好（subtle push-in、輕微 handheld），因為位移小、窗口內幀數夠。快速運鏡是另一回事。
 
-## HOW
+## 解法：ComfyUI 與 Seedance 對照
 
 ### ComfyUI
 

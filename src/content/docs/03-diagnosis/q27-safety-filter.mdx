@@ -9,7 +9,7 @@ sidebar:
 
 2026 年 2 月 MPA 事件後，Safety Filter 從靜態關鍵字過濾升級為嵌入 RLHF 推理的 LLM 意圖判斷——同一個 prompt 昨天能過、今天被擋，因為 filter 不是規則引擎，是動態模型。
 
-## WHY：為什麼審查標準每天都在變？
+## 為什麼審查標準每天都在變？
 
 ### 從關鍵字過濾到意圖判斷
 
@@ -31,7 +31,7 @@ sidebar:
 
 Filter 核心策略是 **pattern-matching 已知身份**，不是阻擋所有 realistic faces。真實人物（演員、公眾人物）的臉部 embedding 在訓練資料中已建立對應——filter 直接命中。原創角色（不存在於訓練資料中的臉）無預存 embedding，通過率較高。
 
-## HOW：社群應對策略
+## 社群應對策略
 
 ### 原創角色優先
 

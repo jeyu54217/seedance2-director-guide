@@ -9,7 +9,7 @@ sidebar:
 
 動作太快時，物體消失、邊緣模糊、畫面崩潰——[Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 跨幀 token 匹配在高速運動時失敗，[Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) 窗口截斷讓高速場景首當其衝。
 
-## WHY：Temporal Attention 的 token tracker 跟丟了
+## Temporal Attention 的 token tracker 跟丟了
 
 [Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 負責在相鄰幀之間匹配 token——第 1 幀「奔跑中的人的左手」要和第 2 幀「同一個人的左手」對齊。匹配的數學基礎是 [Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼：兩個 token 的空間位置 + 時間位置的餘弦相似度。
 
@@ -17,13 +17,13 @@ sidebar:
 
 這跟 [Q22：肢體融化](q20-limb-melting/)（SNR 崩潰把肢體當雜訊砍）和 [Q25：物理失敗](q24-physics-failure/)（Physics Reward 的表面模擬）不同——這是 **token 追蹤層面的失敗**。消失的物體不是「物理上不合理地漂浮」，而是「模型的 attention tracker 直接失去了對這個物體的追蹤」。
 
-## WHAT：O(n²) 截斷讓高速場景更脆弱
+## O(n²) 截斷讓高速場景更脆弱
 
 [Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) 瓶頸（Self-Attention 佔 76% 運算）導致實際部署時 Temporal Attention 的匹配窗口被截斷為有限幀數。高速場景中物體在更少幀內位移更大——窗口內可用的匹配幀更少、位移更大 = 匹配成功率急劇下降。
 
 [Q14：運鏡機制](../02-seedance/q14-camera-motion/) 的預訓練視覺先驗從反面印證：訓練數據中「slow camera movement」遠多於「fast whip pan」。模型根本沒有足夠的訓練樣本學會在高速場景下維持 temporal consistency。
 
-## HOW
+## 解法
 
 - **降低運動速度**：morphic.com 指南的結論 "walks slowly > sprints"——慢速連續運動是 Temporal Attention 的甜蜜點
 - **慢速 dolly-in 代替快速 zoom**：同樣是靠近主體，dolly-in（物理移動攝影機）在幀間位移分佈均勻，zoom（改變焦距）造成邊緣區域的非線性位移

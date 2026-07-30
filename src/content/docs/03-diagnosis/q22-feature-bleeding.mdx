@@ -9,7 +9,7 @@ sidebar:
 
 兩個角色的視覺特徵太接近（同色系、同髮色）→ [Q4：注意力機制](../01-basics/q04-attention/) 的 Cross-Attention Key/Value 路由混淆 → [Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 Dynamic Weight Masking 解耦失敗 → 紅衣角色的紅色滲透到白衣角色身上。
 
-## WHY：Cross-Attention 的隔離機制怎麼失效的？
+## Cross-Attention 的隔離機制怎麼失效的？
 
 [Q4：注意力機制](../01-basics/q04-attention/) 在解釋 Feature Bleeding 時已經給出原始機制：`@image1`（紅衣）和 `@image2`（白衣）同時存在，Cross-Attention 沒正確隔離兩組 Key/Value → 紅色滲透到白色區。
 
@@ -17,11 +17,11 @@ sidebar:
 
 但這個遮罩的有效性**完全依賴模型對兩個角色視覺特徵的解耦能力**。如果兩個角色的色系太接近（紅色 vs 橘色），Cross-Attention 的 Query 在 latent space 中分不清哪個 K/V 屬於哪個角色——遮罩形同虛設。
 
-## WHAT：甜蜜點與上限
+## 甜蜜點與上限
 
 [Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) 的素材上限分析：兩個角色是甜蜜點，三個以上 Identity 開始漂移。這不是硬體限制——是 Cross-Attention 的注意力資源有限。每個新增的角色分走一部分 Attention 權重，隔離精度等比下降。
 
-## HOW
+## 解法：ComfyUI 與 Seedance 對照
 
 ### ComfyUI
 

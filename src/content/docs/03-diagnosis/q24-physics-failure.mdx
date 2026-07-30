@@ -9,19 +9,19 @@ sidebar:
 
 [Q12：三階段訓練](../02-seedance/q12-training/) 的 Physics Reward 讓模型學會「輸出看起來符合物理的畫面」——跟「理解物理」是兩回事。模型不知道 F=ma，它只知道這種畫面排列在訓練資料中常出現。
 
-## WHY：Physics Reward 的本質限制
+## Physics Reward 的本質限制
 
 [Q12：三階段訓練](../02-seedance/q12-training/) 詳細描述了 Seedance 2.0 的訓練流程。第一階段（超大規模預訓練）在數億組音影片中建立對重力、光線、碰撞的**統計模式識別**——不是理解物理定律，而是「看過夠多次蘋果往下掉，所以知道蘋果不該往上飄」。第三階段 RLHF 中的 **Physics Reward** 懲罰穿模、反重力等明顯物理錯誤。
 
 但這是 reward hacking——模型學會的是**最大化 Physics Reward 分數**，不是內化物理定律。一個畫面看起來像真的物理，reward 就給高分。至於畫面背後的因果關係（碰撞角度→反彈方向、重量→加速度）——模型只是複製訓練資料中的統計規律。
 
-## WHAT：AV-Phys Bench 的量化證據
+## AV-Phys Bench 的量化證據
 
 [AV-Phys Bench (Tian et al., §4)](https://arxiv.org/abs/2605.07061) 評測了 7 個影片生成模型。Seedance 2.0 綜合得分最高——例如正確處理了鐘聲與鐘擺的音畫因果。但**所有模型在複雜物理場景（多物體互動、流體、碰撞）中仍頻繁出現幻覺**。
 
 關鍵洞察：Seedance 2.0 表現最好，但「最好」的意思是「錯誤比別人少」，不是「物理正確」。
 
-## HOW：分級策略
+## 分級策略：依場景複雜度選擇約束強度
 
 [Q4：注意力機制](../01-basics/q04-attention/) 明確指出 ControlNet 走獨立 encoder + residual injection——這是最可靠的幾何約束路徑，不走 Cross-Attention 文字引導。
 

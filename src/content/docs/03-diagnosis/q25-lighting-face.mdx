@@ -9,7 +9,7 @@ sidebar:
 
 暗場景的 VAE latent 資訊密度太低，Cross-Attention 的 Query 找不到足夠的 Key/Value 來鎖定臉部特徵——模型只能在黑暗中「猜」一張臉。
 
-## WHY：為什麼光一暗臉就變？
+## 為什麼光一暗臉就變？
 
 [Q4：注意力機制](../01-basics/q04-attention/) 的 Cross-Attention 是模型接收外部條件的入口：文字 token、參考圖 token 透過 Query 去查閱當前生成 token 的 Key/Value，決定畫面內容。
 
@@ -23,7 +23,7 @@ Cross-Attention 在這些 token 上運作時，Query 找不到夠強的 Key/Valu
 
 不是「模型忘記參考圖」，而是**參考圖的資訊在暗場景 token 中根本投不進去。**
 
-## HOW：機制細節
+## 暗場景下的 Attention 退化機制
 
 ### 亮度與 Cross-Attention 權重
 

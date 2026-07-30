@@ -11,15 +11,13 @@ sidebar:
 
 ## 唇形同步延遲
 
-### WHY
-
-[Q10：雙分支架構](../02-seedance/q10-dual-branch/) 的核心機制：Visual Branch 和 Audio Branch 共用同一個去噪排程，每一步透過 **Cross-Modal Joint Module** 交換狀態。Audio Branch 把 **phoneme timing**（哪個音素在什麼時間點發出）傳給 Visual Branch——/p/ 音（雙唇爆破）→ 對應幀的嘴唇區域 latent 調整：雙唇閉合、爆破張開。
+### Prompt 文字才是唇形 ground truth，不是上傳音訊：Visual Branch 和 Audio Branch 共用同一個去噪排程，每一步透過 **Cross-Modal Joint Module** 交換狀態。Audio Branch 把 **phoneme timing**（哪個音素在什麼時間點發出）傳給 Visual Branch——/p/ 音（雙唇爆破）→ 對應幀的嘴唇區域 latent 調整：雙唇閉合、爆破張開。
 
 關鍵在於：這個 phoneme timing 是從 **Prompt 中的雙引號對白文字** 經 TTS 層生成的——**不是從上傳的音訊檔案提取的**。上傳的 @Audio1 是節奏和語調的參考（[Q10](../02-seedance/q10-dual-branch/) 明確指出：上傳音訊是 voice style reference，不是 voice cloning source）。
 
 這解釋了為什麼唇形延遲在嘈雜錄音中更嚴重（120–200ms vs 乾淨錄音 40–80ms）：TTS 層從 Prompt 文字推斷 phoneme timing 時，嘈雜的音訊參考會干擾 timing prediction——Audio Branch 試圖匹配 noisy reference 的節奏，反而偏移了文字本來的 phoneme 時序。crepal.ai 實測數據。
 
-### HOW
+### 改善唇形同步的實務做法
 
 - 對白 ≤12 詞 / 10 秒，≤20 詞 / 15 秒（ugccopilot.ai 最佳實踐）
 - 精確時間標籤 `[00:01-00:03]` 提供 explicit timing anchor
@@ -29,17 +27,17 @@ sidebar:
 
 ## 音訊品質問題
 
-### WHY：為什麼非英語發音怪怪的？
+### 為什麼非英語發音怪怪的？
 
 [Q18：中英文 Prompt](../02-seedance/q18-zh-en-prompt/) 揭示了訓練數據的語言偏差——Seedance 2.0 以中文影片為主訓練。非英語語言的 phoneme 集合（法語鼻母音、阿拉伯語喉音、義大利語彈舌音）在訓練數據中覆蓋率低。
 
 [Q10](../02-seedance/q10-dual-branch/) 的 TTS 層使用通用音素模型（學術參考：OmniTalker 的 text encoder → duration predictor → mel-spectrogram diffusion → vocoder 流程）——這個模型對所有語言套用同一套 phoneme mapping。非英語的特殊音素被**扁平化為最接近的英語/中文音素**。結果：法語的 "u" 變成英文的 "oo"，阿拉伯語的 "ع" 被完全跳過。
 
-### WHY：音樂節奏為什麼被改變、單詞為什麼重複？
+### 音樂節奏為什麼被改變、單詞為什麼重複？
 
 [Q10](../02-seedance/q10-dual-branch/) 的 Audio Branch 在去噪後段同樣面臨 [Q5：CFG](../01-basics/q05-cfg/) 描述的 SNR 衰減問題——長序列中 Audio Branch 的 denoising 後段對節奏和韻律的控制力下降，類似 Visual Branch 在後段的肢體融化（[Q22：肢體融化](q20-limb-melting/)）。節奏 drift 和單詞重複是 Audio Branch 版本的「多手多腳」。
 
-### HOW
+### 改善音訊品質的實務做法
 
 - 先用 ElevenLabs / Hume 生成乾淨音檔，再 @Audio1 上傳——讓 TTS 層有高品質的節奏參考
 - 非英語對白：phonetic spelling（用近似發音拼寫難詞），簡化句子、拆分長句
