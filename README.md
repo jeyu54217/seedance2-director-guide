@@ -2,6 +2,8 @@
 
 靜態 MDX→HTML 單頁網站。35 篇 Q&A（Part 1–4），zh-TW。
 
+作者：[jeyu54217](https://github.com/jeyu54217)，DeepSeek V4 Pro 輔助研究與撰寫。
+
 ## 連結
 
 - **網站**：<https://jeyu54217.github.io/seedance2-director-guide/>
@@ -29,4 +31,6 @@ src/content/docs/
 
 ## 授權
 
-CC0 — 內容以 [Creative Commons Zero](https://creativecommons.org/publicdomain/zero/1.0/) 釋出。
+內容以 [CC0](https://creativecommons.org/publicdomain/zero/1.0/) 釋出——可自由複製、修改、商用，不需署名。
+
+如果你引用這份 Guide，保留署名是慣例而非義務。感謝。
