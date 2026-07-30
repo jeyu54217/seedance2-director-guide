@@ -1,87 +1,60 @@
 ---
 title: 為什麼可以一次生成帶聲音的影片？——雙分支架構（Dual-Branch DiT）
-description: 畫面 DiT 和聲音 DiT 在同一去噪過程中雙向交換資訊，確保影音同步生成
+description: 畫面 DiT 和聲音 DiT 在同一去噪過程中並行，每一步雙向 cross-attention 互傳狀態，影音同步生成
 sidebar:
   order: 2
 ---
 
 ## 一句話
 
-同一去噪過程跑兩條平行的 DiT 分支——畫面一條、聲音一條——每一步透過雙向 cross-attention 互傳狀態，確保影音時間對齊。
+同一去噪過程跑兩條平行的 DiT 分支——畫面一條、聲音一條——每一步雙向 cross-attention 互傳狀態，影音在同一過程中同步成形。
 
-## 為什麼不能先生成畫面再配音？
+## 先生成畫面再配音，為什麼不行？
 
-級聯做法（先生成靜音影片，再補聲音）：影片模型不知道後面會有聲音，嘴唇動作不為語音預留空間；音效模型只能看著已完成畫面「猜」時間點。嘴唇在第 47 幀閉合、聲音第 50 幀才觸發——差三幀就出戲。
+級聯做法：先生成靜音影片，再拿影片去生成聲音。問題出在兩階段互不認識——影片模型不知道後面會有聲音，嘴唇動作不為語音預留空間；音效模型只能看著已完成畫面「猜」時間點。嘴唇在第 47 幀閉合、撞擊聲第 50 幀才觸發——差三幀就出戲。
 
-級聯把影音當成兩個獨立問題，但現實中影音是同一事件的兩種表徵——嘴唇閉合和 /p/ 音同時發生。聯合生成（joint generation）在同一過程中同時產生兩種模態，每一步互相修正。
+級聯把影音當成兩個獨立問題。但現實中影音是同一事件的兩種表徵——嘴唇閉合和 /p/ 音同時發生，杯子落地和撞擊聲同時發生。聯合生成在同一過程中同時產出兩種模態，每一步互相修正。
 
-## 雙分支 DiT 怎麼做到聯合生成？
+## 雙分支 DiT 怎麼做到？
 
-兩條平行的 DiT 分支，一條處理畫面、一條處理聲音，共享同一個去噪時序。每個 DiT block 內，video token 和 audio token 透過 **雙向 cross-attention** 互相讀取對方的當前狀態。
+架構很直接：兩條 DiT 並排跑同一個去噪時序——這是 [Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) 機制的延伸，只是把「文字和圖片融合」換成「畫面和聲音融合」。每個 DiT block 內，video token 和 audio token 透過 [Q4：注意力機制](../01-basics/q04-attention/) 的**雙向 cross-attention** 互讀對方的當前狀態——video 問 audio「你現在什麼狀態？」，找出 audio 中跟當前畫面最相關的時間點，拉過來；audio 反過來也問 video。兩個方向的查詢在同一層內完成。
 
-```
-Step t = T（純雜訊）:
-  Video tokens ⇄ Bidirectional Cross-Attention ⇄ Audio tokens
-Step t = T-1:
-  Video tokens（浮現輪廓）⇄ Bidirectional Cross-Attention ⇄ Audio tokens（浮現背景音）
-  ...
-Step t = 0:
-  Video tokens（乾淨畫面）  Audio tokens（對白 + 音效 + 環境音）
-```
+但 cross-attention 需要知道「第 47 幀畫面」對應「第 47 幀的聲音」。video 和 audio 的時間粒度不同——video 每秒 24 幀，audio 是 mel-spectrogram 的時間切片。解法：同一瞬間的 video frame 和 audio segment 標上相同的時間編號，強制 cross-attention 沿時間軸對齊。結果模型自己學到 emergent correspondence——杯子落地的畫面變化自然觸發撞擊音效，不需要手動標記「這裡有碰撞」。
 
-這是學術界共識——JavisDiT (ICLR 2026)、LTX-2 (2026) 等開源系統均採用此架構。
+訓練策略也很關鍵。Audio 分支先用 video 分支的預訓練權重初始化，凍結 self-attention 層（模態內生成能力已學會），只訓練 cross-attention 層學跨模態對齊。這是開源系統（JavisDiT, ICLR 2026; LTX-2, 2026）的標準做法。
 
-### 機制一：雙向 Cross-Attention
+## Seedance 2.0 實際怎麼用？
 
-每個 DiT block 內，video 端去查 audio 端「你現在什麼狀態」，找出 audio 中哪些時間點跟當前畫面最相關，把對應的 audio 資訊拉過來；反方向同理——audio 端也去查 video 端。兩個方向的查詢在同一層內完成。
+Seedance 1.5 Pro 和 2.0 論文對 dual-branch 架構僅一句話帶過，未揭露實作細節。以下是社群實測確認的產品行為：
 
-LTX-2 進一步引入 **cross-modality AdaLN**：兩個分支共用同一個時間訊號來控制各自的去噪進度——某個分支跑到 step t 時，不只根據自己的時間訊號決定去噪力度，也參考對方的，確保兩邊不會一個跑太快、一個還在雜訊裡。
+- prompt 中用 `"..."` 雙引號包住的文字，會路由到 audio branch 生成語音
+- 同時輸出對白、環境音、背景音樂三條獨立音軌
+- 上傳的音訊檔案作為語音風格參考（節奏、語調），不是 1:1 複製
 
-### 機制二：時間對齊
-
-Video 和 audio 的時間粒度不同——video 是一秒 24 幀的序列，audio 是 mel-spectrogram 的時間切片。要讓 cross-attention 知道「第 47 幀畫面」對應「第 47 幀的聲音」，需要顯式標記。
-
-做法：把同一瞬間的 video frame 和 audio segment 標上相同的時間編號——像時間戳對齊——讓模型知道這兩筆資料屬於同一時刻。LTX-2 的做法更直接：跨模態 attention 時只看時間維度的位置編碼，強制模型沿時間軸對齊。
-
-結果：cross-attention 自己學到 emergent correspondence——杯子落地的畫面變化自然觸發撞擊音效，不需要手動標記「這裡有碰撞」。
-
-### 機制三：訓練策略
-
-不是從零訓練。標準做法：
-
-1. **Audio 預訓練**：用 video branch 的預訓練權重初始化 audio branch，在純音頻資料上訓練
-2. **凍結 self-attention，只訓練 cross-attention**：兩個分支各自的 self-attention 已學會模態內的生成能力，凍結它們，只讓 cross-attention 層學跨模態對齊
-3. **偏好優化（可選）**：JavisDiT++ 引入 AV-DPO，用 reward model 評估影音品質、一致性、同步度，讓生成結果更接近人類偏好
-
-## Seedance 2.0 的產品聲稱
-
-Seedance 1.5 Pro 和 2.0 論文對 dual-branch DiT 的架構描述僅限於「採用 MMDiT 架構」一句話，未揭露任何實作細節。
-
-Seedance 2.0 Model Card 的產品聲稱（機制未驗證）：
-
-- **Multi-track 輸出**：同時輸出對白、環境音、背景音樂三條音軌
-- **Binaural audio**：雙耳立體聲——聲稱具備此能力，未描述空間音訊的計算方式
-- **雙引號觸發語音**：prompt 中 `"..."` 內文字路由到 audio branch 生成語音（社群實測確認的產品行為，非論文描述）
-
-:::caution[⚠️ 誠實揭露]
-本 Q 中的雙向 cross-attention、cross-modality AdaLN、時間戳對齊等機制來自學術界公開論文（JavisDiT / LTX-2 / JavisDiT++），非 Seedance 官方揭露。Seedance 的實際實作方式未公開。
-:::
-
-### Talker-T2AV 的批判
-
-Talker-T2AV (2026) 指出：dual-DiT 在每個 denoising step 都做跨模態 attention 可能不是最優解——語音和臉部動作在高層語意上高度相關，但低層信號（聲波 vs. 像素紋理）的生成路徑本質不同，強制在所有層級糾纏在一起反而降低效率。
+對白場景控制在 10 秒內、12–20 詞。句子間加停頓標記作為重同步錨點。多人對白和複雜音效疊加仍是開放問題。
 
 :::tip[🎬 導演要點]
-- dual-branch DiT 的同步精度來自訓練階段嵌入的 cross-attention 權重——外部工具（ComfyUI 的級聯 MMAudio/AudioLDM）無法重現同等精度
-- 對白場景控制在 10 秒內、12–20 個詞；句子間加停頓標記作重同步錨點
-- 多人對白和複雜音效疊加仍是開放問題——Seedance 2.0 論文也承認
+
+Dual-branch 的影音同步精度來自訓練時嵌入的 cross-attention 權重——ComfyUI 的級聯工具（MMAudio/AudioLDM）先生成畫面再配音，無法重現同等精度。
+
+對白文字寫進 prompt 雙引號，不要只靠上傳音訊。唇形同步的 ground truth 來自 prompt 文字經過 TTS 層產生的 phoneme timing——上傳音訊是風格參考，不是同步來源（見 [Q25：唇形延遲](../../03-diagnosis/q25-lip-sync/)）。
+
 :::
 
 :::note[📖 引用論文]
 [Seedance 1.5 Pro](https://arxiv.org/abs/2512.13507) — 提出 dual-branch DiT + cross-modal joint module 概念（架構細節未揭露）。
+
 [Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 聲稱 multi-track 輸出、binaural audio（機制未揭露）。
+
 [JavisDiT (ICLR 2026)](https://arxiv.org/abs/2503.23377) — dual-branch DiT with bidirectional cross-attention，每個 block 內 video↔audio 雙向交互。
-[LTX-2 (2026)](https://arxiv.org/abs/2601.03233) — 14B video + 5B audio asymmetric dual-stream，cross-modality AdaLN + 1D temporal RoPE，開源。
-[JavisDiT++ (ICLR 2026)](https://arxiv.org/abs/2602.19163) — TA-RoPE 實現 frame-level 影音時間對齊，MS-MoE 分離跨模態交互與模態內聚合。
-[Talker-T2AV (2026)](https://arxiv.org/abs/2604.23586) — 指出 pervasive cross-modal attention 在高層語意有效，但在低層信號渲染為次優。
+
+[LTX-2 (2026)](https://arxiv.org/abs/2601.03233) — 14B video + 5B audio asymmetric dual-stream，cross-modality AdaLN，開源。
+
+[JavisDiT++ (ICLR 2026)](https://arxiv.org/abs/2602.19163) — TA-RoPE 實現 frame-level 影音時間對齊。
+
+[Talker-T2AV (2026)](https://arxiv.org/abs/2604.23586) — 指出 pervasive cross-modal attention 在高層語意有效，低層信號渲染路徑不同，強制全層級糾纏可能次優。
+:::
+
+:::caution[⚠️ 誠實揭露]
+雙向 cross-attention、時間戳對齊、訓練策略（凍結 self-attention 只訓練 cross-attention）來自 JavisDiT / LTX-2 / JavisDiT++ 等公開論文，非 Seedance 官方揭露。Seedance 2.0 實際實作方式未公開。Talker-T2AV (2026) 指出跨模態 attention 在高層語意有效，但低層信號（聲波 vs. 像素紋理）生成路徑本質不同，強制所有層級糾纏可能不是最優解。
 :::

@@ -1,77 +1,60 @@
 ---
-title: Seedance 如何處理圖片、影片、文字、音訊等多模態輸入，背後的機制是什麼
-description: 各模態各自編碼成 token→串聯單一序列→Joint Self-Attention 跨模態共同處理
+title: Seedance 如何同時讀懂文字、圖片、影片、音訊？——多模態融合（Multimodal Fusion）
+description: 各模態各自編碼成 token，串聯成單一序列，Joint Self-Attention 讓文字、圖片、影片、聲音在每一步去噪中跨模態對話
 sidebar:
   order: 1
 ---
 
 ## 一句話
 
-各模態先各自編碼成 token，串聯成同一條序列，送進 DiT 的 Joint Self-Attention 讓所有 token 跨模態對話。
+各模態各自編碼成 token、串成同一條序列，Joint Self-Attention 讓所有 token 在每一步去噪中跨模態互相對看、持續對齊。
 
-## 為什麼需要融合
+## 如果不融合，會怎樣？
 
-如果各模態分開處理——文字走 Text Encoder、圖片走 VAE Encoder、影片再走另一個 encoder——各自算完再硬接，**不同模態的 token 從未在同一個計算空間中互相對齊**。文字說「金髮」，圖片 token 不知道；參考圖鎖定了角色外觀，但 prompt 的場景描述和參考影片的運鏡節奏互不協調。
+你同時給了文字 prompt 和 `@image1` 參考圖（[Q11：@ 標籤](../02-seedance/q11-at-tags/)）。文字說「金髮」，圖片是紅髮。如果兩條輸入分開處理、各自算完再硬接——文字 token 和圖片 token 從未在同一個計算空間中對話過。模型被迫在兩個互不相通的資訊源之間妥協，結果角色長相一部分聽 prompt、一部分聽參考圖——誰都不完整。
 
-## 機制：三步
+這不是多給素材就會變好。**多模態輸入真正的難題不是編碼——是對齊。** 不同模態的 token 必須在同一個計算空間中互相看見、互相修正，融合才有意義。
 
-### 第一步：各模態走自己的編碼路徑
+## 三步：從各自編碼到跨模態對話
 
-每種輸入有專屬的編碼器，產出 token 序列：
+**第一步：全部變成 token。** 不管來源是什麼，編碼器輸出的都是同一種東西——token 序列。文字走 Text Encoder（CLIP / T5-XXL）產出語意 token；圖片走 VAE Encoder 壓 latent、切 patch，每個 patch 附上 2D 空間位置變成視覺 token；影片多一條時間軸——3D causal VAE 同時壓縮空間和時間，產出附 3D 位置（空間+時間）的時空 token。概念源於 Sora（OpenAI, 2024）的 spacetime patches，CogVideoX（Yang et al., 2024）將其與 DiT 架構結合。
 
-| 模態 | 編碼器 | 輸出 token | 位置編碼 |
-|------|--------|-----------|----------|
-| 文字 | Text Encoder（CLIP / T5-XXL） | Text embedding（77–512 個 token） | 文字序列位置 |
-| 圖片（`@image1`） | VAE Encoder → 2D latent → Patchify | 2D 視覺 token（64×64 latent → 1024 token） | 2D 空間位置 |
-| 影片（`@video1`） | 3D VAE Encoder → Spacetime latent → Patchify | 時空 token（幀數 × 每幀 patch） | 3D 位置（空間 + 時間） |
-| 去噪目標 | 隨機初始化 | 雜訊 token | 與輸出對齊 |
+**第二步：串聯，並標記來源。** 所有 token 串成一條：`[text | image | video | noise]`。但單純串聯不夠——Transformer 需要知道誰來自哪裡。解法：疊兩層位置資訊。第一層標 token 在自己模態內的空間或時間座標（[Q3：圖像區塊化](../01-basics/q03-patchify/) 的 patch 網格、[Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼）；第二層是模態標記（Modality-Specific Position Embedding），告訴模型「這一區是文字」「這一區是圖片」。模型同時知道 token 的空間位置和來源模態。
 
-文字編碼沿用 [Q4：Attention 機制](#q4) 的 CLIP/T5-XXL。圖片 Patchify 沿用 [Q3：圖像區塊化與 DiT](#q3)：VAE 壓成 latent，切成 patch，每個 patch 是一個 token 附 2D 位置編碼。影片換成 **3D causal VAE**，額外加上時間軸壓縮——圖片 token 只有空間位置，影片 token 有空間+時間雙重編碼。時空 patch 概念源於 **Sora（OpenAI, 2024）**，**CogVideoX（Yang et al., 2024）** 將其與 MM-DiT 架構結合。
+**第三步：Joint Self-Attention——跨模態對話。** 串聯後的序列送進 DiT，[Q4：注意力機制](../01-basics/q04-attention/) 的 Self-Attention 在所有 token 上運算，不管來源。文字可以看向圖片、noise 可以看向影片。數學上就是 `Attention(Q,K,V) = softmax(QKᵀ/√d) × V`，只是輸入序列包含了多模態。背後的架構是 MM-DiT（SD3, Esser et al., 2024）：各模態有獨立的權重和 LayerNorm，但在 Self-Attention 層共用 QKV 計算——各自正規化、共同注意。
 
-### 第二步：串聯成單一序列
+**這就是跨模態一致性的來源。** 參考圖的 visual token 和 noise token 從 step 999 到 step 0，每一步、每一層都在一起計算。noise token 持續看向參考圖 token，每一步都在調整自己的特徵向量跟參考圖對齊。角色跨多秒不變臉——不是生成完修圖，是每一步都在對齊。
 
-所有 token 串在一起：
+## 對導演來說，這代表什麼？
 
-```
-[ text_tokens | image_tokens | video_tokens | noise_tokens ]
-```
+文字和參考圖有協同效果。Joint Attention 讓文字 token 和視覺 token 在同一層交換資訊——寫 `"@image1 的角色站在黃昏沙灘上"` 比先畫角色再加背景有效，文字語意直接疊加在視覺特徵上。
 
-這條序列就是 DiT 每一步去噪的全部輸入。
+多素材隔離靠特徵距離。素材色系差異越大（紅 vs 藍 >> 紅 vs 橘），特徵向量在 Attention 空間中距離越遠，隔離越乾淨。兩個黑髮角色同時引用，特徵容易混淆——這是 Identity Drift 的機制根源（見 [Q23：身分漂移](../../03-diagnosis/q23-identity-drift/)）。
 
-但單純串聯還不夠——Transformer 需要知道每個 token 來自哪個模態。除了第一步表格中的 per-modality 位置編碼（token 在自身模態內的空間/時間位置），還要疊加一層**模態標記（Modality-Specific Position Embedding）**，告訴 DiT「這一區是文字」「這一區是圖片」。兩層位置編碼疊加，模型同時知道 token 的空間位置和來源模態。
-
-### 第三步：Joint Self-Attention——跨模態對話
-
-串聯後的序列送進 DiT，Self-Attention 在整條序列上運算——每個 token 看向所有其他 token。文字可以看向圖片、圖片看向 noise、noise 看向影片。數學上就是標準的 `Attention(Q, K, V) = softmax(QKᵀ/√d) × V`，只是輸入序列包含了多模態。
-
-關鍵設計是 **MM-DiT（Multi-Modal Diffusion Transformer，多模態擴散 Transformer）**（SD3, Esser et al., 2024）：Text 和 Visual 各自有獨立的 MLP 和 LayerNorm，但在 Self-Attention 層共用 QKV 計算——各自權重、共用 Attention。每種模態在 Attention 前先經過 **AdaLN（Adaptive Layer Normalization，適應性層正規化）**，確保不同模態的特徵在融合前已被正規化到可比範圍。
-
-這就是跨模態一致性的來源：參考圖的 visual token 和 noise token 在每一步去噪、每一層 Attention 中一起計算。從 step 999 到 step 0，noise token 持續看向參考圖 token，每一步都在調整特徵向量使其與參考圖對齊。角色跨多秒不變臉——不是事後修圖，是每層每步持續對齊。
-
-`@image1` 的 visual token 透過 attention mask 精確路由，確保「這個角色」的 noise token 只看「這張參考圖」的 key/value——詳見 [Q11：@ 標籤機制](#q11)。
+Prompt 具體程度決定融合強度：「午後陽光從窗戶斜射進來，地上長方形光斑」>「溫暖的房間」。
 
 :::tip[🎬 導演要點]
-**文字和參考圖有協同效果**：Joint Attention 讓文字 token 和視覺 token 在同一層交換資訊。寫 `"@image1 的角色站在黃昏沙灘上"` 比先畫角色再加背景有效——文字語意在 Attention 中直接疊加在視覺特徵上。
 
-**多素材隔離靠特徵距離**：素材色系差異越大（紅藍 > 紅橘），特徵向量在 Attention 空間中距離越遠，隔離越好。兩個黑髮角色同時引用，特徵容易混淆——這是 Identity 漂移的機制根源。
+Joint Attention 是 Seedance 跨模態一致性的根基——參考圖角色不變臉不是靠後製，是靠每一步持續對齊。
 
-**Prompt 具體程度決定融合強度**：「午後陽光從窗戶斜射進來，在地板上形成長方形光斑」> 「溫暖的房間」。
+素材上限來自注意力資源分配，不是硬體限制。兩個角色是甜蜜點，三個以上 Identity 開始漂移——每個新增角色分走一部分 Attention 權重（見 [Q28：多角色混淆](../../03-diagnosis/q28-feature-bleeding/)）。
 
-**音訊走獨立分支**：對白文字→語音+唇形同步，詳見 [Q10：雙分支架構](#q10)。
-:::
+雜亂背景會被當成 identity 特徵一起編碼——參考圖請用純色背景正面特寫。
 
-:::caution[⚠️ 誠實揭露]
-Seedance 2.0 Model Card 未揭露 VAE 架構、Text Encoder 選型、Joint Attention 變體。以上機制基於 MM-DiT、CogVideoX 等已發表論文的通用架構，Seedance 具體選型以官方技術論文為準。
 :::
 
 :::note[📖 引用論文]
-[MM-DiT / SD3 (Esser et al., 2024, §3.2)](https://arxiv.org/abs/2403.03206) — 多模態 DiT 架構，各自權重、共用 joint self-attention、per-modality AdaLN。
+[MM-DiT / SD3 (Esser et al., 2024, §3.2)](https://arxiv.org/abs/2403.03206) — 多模態 DiT 架構，各自權重、共用 Joint Self-Attention。
 
-[CogVideoX (Yang et al., 2024, §3.1, §3.3)](https://arxiv.org/abs/2408.06072) — 3D causal VAE 時空編碼、Expert AdaLN 融合機制。
+[CogVideoX (Yang et al., 2024, §3.1, §3.3)](https://arxiv.org/abs/2408.06072) — 3D causal VAE 時空編碼。
 
 [Sora (OpenAI, 2024)](https://openai.com/sora) — spacetime patches 統一視覺表示。
 
 [DiT (Peebles & Xie, ICCV 2023, §3.1)](https://arxiv.org/abs/2212.09748) — Patchify 與 Self-Attention 基礎架構。
 
-[Seedance 2.0 Model Card (§1–2)](https://arxiv.org/abs/2604.14148) — 統一多模態架構、輸入上限（3 影片 / 9 圖片 / 3 音訊）。
+[Seedance 2.0 Model Card (§1–2)](https://arxiv.org/abs/2604.14148) — 統一多模態架構，輸入上限（3 影片 / 9 圖片 / 3 音訊）。
+:::
+
+:::caution[⚠️ 誠實揭露]
+Seedance 2.0 Model Card 未揭露 VAE 架構、Text Encoder 選型、Joint Attention 變體。以上機制基於 MM-DiT、CogVideoX 等已發表論文的通用架構，Seedance 具體選型以官方技術論文為準。
 :::

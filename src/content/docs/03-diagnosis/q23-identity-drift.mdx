@@ -1,52 +1,51 @@
 ---
-title: 同一角色換鏡頭就變臉（Identity Drift）——跨鏡頭身份漂移 + 延伸劣化
-description: Cross-Attention 的 Identity Embedding 隨序列長度衰減——解析度/長寬比變動觸發 patch 網格重算，Attention 參考點移位
+title: 同一角色換鏡頭就變臉（Identity Drift）——跨鏡頭身份漂移
+description: Cross-Attention 對參考圖的注意力在去噪後段自然衰減——解析度/長寬比變動觸發 patch 網格重算，參考點移位，角色漂走
 sidebar:
   order: 5
 ---
 
 ## 一句話
 
-同一個角色，換個鏡頭就變了一張臉——[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 Identity Embedding 在長序列中去噪後段權重衰減，加上 [Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼在解析度變動時重算 patch 網格，Attention 參考點全部移位。
+同一個角色換鏡頭就變臉，根因是去噪後段對參考圖的注意力自然衰減——解析度變動或序列太長時，衰減累積到參考點對不上，角色就漂走了。
 
-## 為什麼換鏡頭就變臉？
+## 為什麼換個鏡頭角色就變臉？
 
-[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的機制是把參考圖的視覺特徵當作 embedding slot 直接灌進 Cross-Attention。`@image1` 的面部 Key/Value 在每一步去噪都被 Query 查閱——這是 Seedance 2.0 維持角色一致性的核心。
+先用一張參考圖鎖角色是怎麼運作的。你把角色照片丟進 `@image1`（機制詳見 [Q11：@ 標籤](../02-seedance/q11-at-tags/)），模型把照片的視覺特徵編碼成一組鍵值對（Key/Value），放進**交叉注意力層（Cross-Attention）**——這是模型比對「正在畫的圖」和「參考圖」的地方。去噪每一步，模型拿目前畫到一半的畫面（Query）去問參考圖（Key）：「我這裡該長怎樣？」，依匹配程度從參考圖提取資訊（Value）。每一步都查一次——這就是角色一致性的根基。
 
-但 [Q4：注意力機制](../01-basics/q04-attention/) 揭示了關鍵限制：Cross-Attention 的 Query-Key 匹配不是靜態的。隨著去噪進行，[Q6：時間步調節](../01-basics/q06-timestep/) 的 AdaLN-Zero 在 t→0（去噪後段）改變了每個 Transformer Block 的行為模式——後段專注紋理細節，對 Identity Embedding 的參考權重**自然衰減**。這是設計特性，不是 bug：後段本來就該補細節，不該繼續查參考圖。
+但去噪不是從頭到尾做同一件事。[Q6：時間步調節](../01-basics/q06-timestep/)講過，去噪分前後兩段：前段（雜訊還很多的時候）決定畫面整體結構和角色長相，模型頻繁查參考圖，參考圖的影響力最大；到了後段（雜訊快清完），任務切換成補紋理、修細節，模型對參考圖的依賴自然下降。
 
-但問題出在：如果序列夠長、鏡頭切換夠多次，這個衰減會累積到角色臉部特徵開始漂移。
+這是正常設計，不是 bug。後段本來就不該繼續從參考圖搬臉型——不然細節補不上去。真正的問題是：**這個衰減沒有安全網。** 設計只保證一般狀況下夠用，但生成過程中的變數一多，衰減會累積到超出安全範圍——角色就開始漂移。
 
-## 兩個觸發條件
+## 什麼時候累積到出事？
 
-**條件一：解析度或長寬比變動。** [Q6](../01-basics/q06-timestep/) 的位置編碼依賴固定的 patch 網格——長寬比一換，網格重算，所有 token 的空間座標重新分配。Cross-Attention 在上一個鏡頭建立的 Key/Value 參考點，在新網格中對應不到原來的空間位置。
+衰減一直都在，一般狀況臉部特徵還撐得住。兩個條件會把衰減推到出事邊緣。
 
-**條件二：Extension 鏈累積劣化。** [Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) Self-Attention 瓶頸意味著長序列不只是「更多幀」——是 token 數量平方成長的運算壓力。實際部署時 Temporal Attention 窗口被截斷以控制計算量，extension 6 次以上的 contextual memory 嚴重衰減。[Q16：Storyboard](../02-seedance/q16-storyboard/) 說明了 multi-shot 架構的本質：每個 shot 有自己的 visual condition 在 denoising 中同時處理，shot 之間的過渡由 Temporal Attention 補出——但 extension 不同於原生 multi-shot，每次 extension 是新的 denoising pass，contextual memory 無法跨 denoising session 完整繼承。
+**換解析度或長寬比。** [Q6](../01-basics/q06-timestep/)的位置編碼靠的是把畫面切成固定網格（patch grid）——每個小區塊的空間座標由它在網格中的位置決定。你一換長寬比，網格就重切，所有區塊的空間座標重新分配。上一個鏡頭在 Cross-Attention 裡建立的「參考圖的哪個位置對應畫面的哪個位置」這套對應關係，在新網格裡全亂了。不是角色變了——是**座標系換了，參考點迷路了**。
 
-## 解法：ComfyUI 與 Seedance 對照
+**序列拉太長。** [Q16：Storyboard 與 Extension](../02-seedance/q16-storyboard/)講過關鍵差異：原生的多鏡頭模式（multi-shot）所有鏡頭在同一次去噪裡處理，鏡頭之間的過渡由時間注意力（Temporal Attention）自然補出來。但 extension 是切成一段一段獨立去噪——每一段都是一次全新的去噪過程，角色身份訊號無法完整跨段落傳遞。六段 extension 下來，每一次傳遞都掉一點訊號，累積到面目模糊。
 
-### ComfyUI
+兩個條件還會疊加：長序列中途換解析度，同時觸發網格重算和跨段落訊號衰減——這是最嚴重的場景。
 
-- **IP-Adapter FaceID Plus V2**，weight **0.8–0.9**：在每步去噪中強制注入面部 identity embedding（引用 [Q4](../01-basics/q04-attention/) 的 IP-Adapter 解耦 Cross-Attention 機制）
-- 疊加 **FaceDetailer**，denoise **0.2–0.35**：後段局部修復面部區域
-- **同一張原始參考圖貫穿全場景**——不要用前一場截圖當下一場參考（[Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) 的警告：累積光源和色調偏差）
-- 鎖定解析度和長寬比——避免觸發 patch 網格重算（Q6 位置編碼）
+## 怎麼鎖住角色？
 
-### Seedance 2.0
+問題是「參考點對不上」，解法就是鎖住參考點不讓它跑。
 
-- `@image1` 用純色背景的正面特寫（[Q9](../02-seedance/q09-multimodal-fusion/) 最佳實踐：背景雜亂會被當成 identity 特徵一起編碼）
-- Prompt 中的角色描述模板**鎖定不變**，只改動作和場景
-- Extension 每次不超過 6 段，每段重新上傳原始參考圖重設 identity anchor
+**鎖參考圖。** 從頭到尾用同一張原始參考圖。純色背景、正面特寫最好——[Q9：多模態融合](../02-seedance/q09-multimodal-fusion/)警告過，雜亂背景會被當成角色特徵一起編碼，換場景就一起漂。更別用前一場的截圖當下一場的參考——截圖自帶光源和色調偏差，跨場傳遞就是慢性漂移。
 
-完整節點參數見 [Part 4：ComfyUI 節點速查](../04-workflow/comfyui-nodes/)，對白近景 preset 見 [Part 4：場景組合](../04-workflow/scene-presets/)。
+**鎖解析度。** 不要換長寬比。需要不同構圖比例？裁切（crop）就好，不要改輸出解析度——改輸出解析度就是叫模型重切網格，參考點直接亂掉。
+
+**鎖 Prompt 角色描述。** 模板鎖死，只改動作和場景。角色描述一變，等於告訴模型「這是新角色」。
+
+**控 Extension 段數。** 一次不超過六段。超過就拆成獨立批次，每批重新上傳原始參考圖，把角色錨點（identity anchor）重設回來。
+
+ComfyUI 對應方案：IP-Adapter FaceID Plus V2，權重 0.8–0.9，強制每步注入臉部特徵；疊加 FaceDetailer，denoise 0.2–0.35，在後段局部修臉。完整節點參數見 [Part 4：ComfyUI 節點速查](../04-workflow/comfyui-nodes/)。
 
 :::tip[🎬 導演要點]
 
-Identity Drift 不是「模型忘記了角色長怎樣」——是 Attention 參考點在長序列和解析度變動中移位了。
+Identity Drift 不是「模型忘記角色長怎樣」——是 Attention 參考點在長序列和解析度變動中移位了。
 
-**鎖定三件事：參考圖（同一張）、解析度（不要換）、Prompt 角色描述（模板鎖死）。**
-
-Extension 本質上是獨立 shot 生成，不是連續拍攝——每段 extension 都是新的起點，需要重新錨定。
+鎖定三樣東西：參考圖（同一張）、解析度（不要換）、Prompt 角色描述（模板鎖死）。Extension 每段都是獨立去噪，不是連續拍攝——每段都要重新錨定 identity anchor。
 
 :::
 
@@ -57,7 +56,8 @@ Extension 本質上是獨立 shot 生成，不是連續拍攝——每段 extens
 
 [Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 多模態參考與序列限制。
 
-[Attention Surgery (arXiv:2509.24899, §1)](https://arxiv.org/abs/2509.24899) — O(n²) Self-Attention 運算佔比。
-
 [Survey of Video Diffusion Models (TMLR 2025, §3.3)](https://arxiv.org/abs/2504.16081) — Temporal Attention 與位置編碼。
+
+:::caution[⚠️ 誠實揭露]
+Attention Surgery 引用已移除——該論文（arXiv:2509.24899）討論的是 O(n²) Self-Attention 運算佔比，與 Identity Drift 的 Cross-Attention 衰減機制無直接關聯。此處分析基於 DiT 架構原理與社區回報現象推論，非 Seedance 官方文件確認。
 :::

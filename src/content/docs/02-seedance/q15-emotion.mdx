@@ -1,69 +1,42 @@
 ---
-title: 「無奈的笑」「笑容僵住面色凝重」——Seedance 怎麼理解情緒？
-description: CLIP 從億級圖文資料中學會情緒與臉部表情的對應，Text Encoder 把情緒文字編成語意向量，Cross-Attention 在去噪中映射為臉部動作
+title: 「無奈的笑」「笑容僵住面色凝重」——Seedance 怎麼理解情緒？（Emotion Understanding）
+description: CLIP 從四億組圖文配對中學會情緒與臉部表情的對應，Text Encoder 把情緒文字編成語意向量，Cross-Attention 在去噪中映射為臉部動作
 sidebar:
   order: 7
 ---
 
 ## 一句話
 
-Seedance 沒有獨立的情緒辨識模組。CLIP Text Encoder 在預訓練階段已經從幾億組網路圖文配對中學到情緒文字對應什麼樣的面部視覺特徵，Cross-Attention 在影片生成訓練中進一步把這些語意訊號映射為具體的臉部動作。
+Seedance 沒有情緒辨識模組——CLIP Text Encoder 從四億組圖文配對中學會情緒文字對應什麼樣的面部視覺特徵，Cross-Attention 再把這些語意訊號映射為具體的臉部動作。
 
-## WHY：CLIP 為什麼會「懂」情緒
+## 模型怎麼「懂」無奈的笑？
 
-CLIP（Contrastive Language-Image Pre-training）用 4 億組網路圖片-文字配對訓練。這些配對大量包含人物照片配上描述表情、情緒、場景氛圍的文字。訓練目標是讓圖片和對應文字的 embedding 在向量空間中靠近。
+你在 prompt 寫了「無奈的笑」。模型架構裡沒有情緒分類器——沒有哪個模組負責把「無奈」翻譯成「眉頭微蹙＋嘴角微揚＋眼眶肌肉不激活」。那模型怎麼知道無奈的笑長怎樣？
 
-結果是：CLIP 的 text encoder 不需要任何人為標注「happy=嘴角上揚」，它從數據中**統計**出「笑」這個字反覆出現在嘴角上揚、眼睛微彎的畫面旁邊，「無奈」反覆出現在眉頭微蹙、眼神黯淡的畫面旁邊。情緒語意是 CLIP 訓練的副產品，不是外加的功能。
+答案在 CLIP Text Encoder 的預訓練過程。CLIP 用四億組網路圖片-文字配對訓練，訓練目標很簡單：讓圖片的 embedding 和對應文字的 embedding 在向量空間中靠近。這些配對大量是人物照片配上描述表情、情緒、氛圍的文字。
 
-EmotionCLIP（Zhang et al., 2023）形式化驗證了這一點：CLIP 從未經策展的日常圖文資料中就能提取有效的情緒表徵，不需要額外的情緒標注資料集。
+**情緒理解是這個訓練過程的副產品，不是外加功能。** CLIP 不需要任何人標注「happy=嘴角上揚」，它從數據中統計出「笑」反覆出現在嘴角上揚的畫面旁邊，「無奈」反覆出現在眉頭微蹙、眼神黯淡的畫面旁邊。EmotionCLIP（Zhang et al., 2023）驗證了：CLIP 從未經策展的日常資料中就能提取有效的情緒表徵。
 
-## WHAT：文字描述怎麼變成臉部動作
+## 從文字到臉部
 
-ExpCLIP（Zhong et al., 2023）走通了完整 pipeline：
+CLIP 有情緒知識，但它是文字 embedding——怎麼變成畫面裡的臉？
 
-1. 用 LLM 針對大量情緒文字生成對應的 **Action Unit（AU）** 組合——例如「無奈的笑」激活 AU4（挑眉）、AU12（嘴角上揚），但不激活 AU6（眼眶肌肉，真笑才用）
-2. 把 AU 組合轉換為 52 維 **blendshape 權重**（3D 臉部模型的標準控制參數）
-3. 用（文字, blendshape）配對訓練一個對齊模型：CLIP text encoder 凍結不動，只在後面接一個輕量的 projector，把文字 embedding 映射到表情空間
+ExpCLIP（Zhong et al., 2023）的關鍵發現：凍結 CLIP text encoder 不動，只在後面接一個輕量的 projector，就能把文字 embedding 映射到表情空間。**凍結 CLIP 就能做到文字→表情對齊**——表示 CLIP 的原始 embedding 已經包含足夠豐富的情緒維度，缺的只是一個「翻譯層」。
 
-關鍵數字：凍結 CLIP 就能做到文字→表情對齊，表示 CLIP 的原始 embedding 已經包含足夠豐富的情緒維度，缺的只是一個「翻譯層」。
+翻譯怎麼做：文字先對應到 Action Unit（AU）組合——例如「無奈的笑」激活 AU4（挑眉）、AU12（嘴角上揚），但不激活 AU6（眼眶肌肉，真笑才用）。AU 再轉為 blendshape 權重，3D 臉部模型的標準控制參數。最後 Cross-Attention 在去噪過程中把這些權重注入臉部區域的 latent token，一步步把模糊的語意訊號雕成具體的臉部動作。
 
-TalkCLIP（Ma et al., 2023）在 135 種情緒分類的資料集上驗證了同一件事，並明確指出：**具體的臉部動作描述（「嘴角上揚、眉毛抬起」）比抽象情緒標籤（「開心」）產生更精確、更強烈的表情。**
+TalkCLIP（Ma et al., 2023）的發現直接影響你怎麼寫 prompt：**具體的臉部動作描述（「嘴角上揚、眉毛抬起」）比抽象情緒標籤（「開心」）產生更精確、更強烈的表情。** 抽象標籤在 embedding 空間中是寬廣的語意區間，動作描述直接對應特定 AU 組合——訊號更集中。
 
-## HOW：「無奈的笑」在 Seedance 中的實際路徑
-
-```
-Prompt「無奈的笑」
-        ↓
-CLIP Text Encoder（凍結權重，預訓練知識）
-        ↓
-一個高維語意向量：不同維度同時編碼了
-  - 「無奈」的情緒 valence（負向、低能量）
-  - 「笑」的臉部動作配置（嘴角上揚）
-        ↓
-Cross-Attention 注入 Video Branch 的臉部區域 latent tokens
-        ↓
-去噪過程中，臉部 latent 被條件化為特定組合：
-  嘴角微揚（笑）＋ 眉頭微蹙 ＋ 眼眶肌肉不激活（非真笑）
-```
-
-不同情緒維度在 embedding 空間中各自獨立、可以疊加——不是離散分類器（happy/sad 二選一），而是連續的向量組合。同一個 embedding 裡可以同時有「嘴角上揚」和「眼神黯淡」的訊號。
-
-Temporal Attention 在連續幀之間平滑這些表情權重的過渡，實現「笑容逐漸僵住」的動態變化。
-
-## 社群實證：FACS + 參考圖的精確控制
-
-Reddit r/generativeAI 社群用戶上傳 FACS（Facial Action Coding System）圖表作為參考圖，在 prompt 中指定具體 AU 編碼來控制臉部肌肉。這在實戰中驗證了 ExpCLIP 的論文 pipeline——AU 作為文字和表情之間的中介表示，確實有效。
-
-ExpCLIP 論文中 AU → blendshape 的轉換由專業動畫師制定映射規則，社群的做法是土法煉鋼但原理相同：把 FACS 圖餵給模型當 reference，讓 Cross-Attention 直接對齊圖中的 AU 視覺訊號。
+情緒 embedding 是連續向量組合，不是離散分類器（happy/sad 二選一）。同一個 embedding 可以同時有「嘴角上揚」和「眼神黯淡」——這就是「無奈的笑」「苦澀的點頭」能工作的原因。[Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 在連續幀之間平滑這些表情權重，實現「笑容逐漸僵住」的動態變化。
 
 :::tip[🎬 導演要點]
-- **描述臉部動作，不要只給情緒標籤**：「嘴角微揚、眼神柔和」優於「開心」，「眉頭緊鎖、嘴唇緊抿」優於「生氣」
-- 情緒可以疊加：embedding 空間支援多維度組合，「無奈的笑」「苦澀的點頭」這類混合表情模型可以處理
-- 需要精確控制時，上傳 FACS 表情參考圖 + 在 prompt 中描述 AU 組合，效果優於純文字
-:::
 
-:::caution[⚠️ 誠實揭露]
-以上機制以 ExpCLIP/TalkCLIP 的論文架構為基礎，結合 DiT 類影片生成模型（Text Encoder + Cross-Attention）的通用設計推論。Seedance 官方論文未描述情緒理解的內部實現，也未公開其 text encoder 的具體版本或是否有額外的表情對齊訓練。Temporal Attention 處理情緒過渡的機制目前無論文直接驗證，仍為推論。
+描述臉部動作，不要只給情緒標籤。「嘴角微揚、眼神柔和」>「開心」；「眉頭緊鎖、嘴唇緊抿」>「生氣」。動作描述命中特定 AU 組合，抽象標籤在 embedding 空間太寬廣。
+
+情緒可疊加——embedding 是連續向量不是二選一。「無奈的笑」「苦澀的點頭」模型能處理。
+
+需要精確控制時，上傳 FACS 表情參考圖＋prompt 描述 AU 組合，效果優於純文字。社群實測驗證了 ExpCLIP 的 AU→blendshape pipeline 在實戰中有效。
+
 :::
 
 :::note[📖 引用論文]
@@ -71,7 +44,13 @@ ExpCLIP 論文中 AU → blendshape 的轉換由專業動畫師制定映射規�
 
 [ExpCLIP (arXiv 2023)](https://arxiv.org/abs/2308.14448) — 文字→AU→blendshape 完整 pipeline，凍結 CLIP 即可對齊表情空間。
 
-[TalkCLIP (arXiv 2023)](https://arxiv.org/abs/2304.00334) — 135 種情緒的文字→表情映射，具體描述優於抽象標籤。
+[TalkCLIP (arXiv 2023)](https://arxiv.org/abs/2304.00334) — 具體臉部動作描述優於抽象情緒標籤。
 
-[EmotionCLIP (arXiv 2023)](https://arxiv.org/abs/2305.13500) — CLIP 從未策展資料中提取情緒表徵的能力驗證。
+[EmotionCLIP (arXiv 2023)](https://arxiv.org/abs/2305.13500) — CLIP 從未策展資料中提取情緒表徵。
+
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 模型架構概述。
+:::
+
+:::caution[⚠️ 誠實揭露]
+以上機制以 ExpCLIP/TalkCLIP 論文架構為基礎，結合 DiT 類影片生成模型（Text Encoder + Cross-Attention）的通用設計推論。Seedance 官方未描述情緒理解的內部實現，未公開 text encoder 具體版本或是否有額外表情對齊訓練。Temporal Attention 處理情緒過渡目前無論文直接驗證。
 :::
