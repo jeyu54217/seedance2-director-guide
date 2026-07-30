@@ -191,7 +191,7 @@ const PAGE_OPEN = `<!DOCTYPE html>
 const PAGE_CLOSE = `
 </main>
 <footer>
-  <p>由 <a href="https://github.com/jeyu54217">jeyu54217</a> 整理，DeepSeek V4 Pro 輔助研究與撰寫 · 來源：<a href="https://share.gemini.google/Jqa3sF8Vg28S">Gemini Deep Research</a> + 18 篇學術論文 + Reddit 社群討論</p>
+  <p>由 <a href="https://github.com/jeyu54217">jeyu54217</a> 整理，DeepSeek V4 Pro 輔助研究與撰寫 · 來源：18 篇學術論文 + Reddit 社群討論</p>
   <p style="margin-top:.3rem">內容以 <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a> 釋出 · 最後更新 2026-07-30</p>
 </footer>
 <script>
