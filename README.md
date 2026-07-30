@@ -1,49 +1,32 @@
-# Starlight Starter Kit: Basics
+# Seedance 2.0 導演技術背景學習指引
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+靜態 MDX→HTML 單頁網站。35 篇 Q&A（Part 1–4），zh-TW。
 
-```
-npm create astro@latest -- --template starlight
-```
+## 連結
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+- **網站**：<https://jeyu54217.github.io/seedance2-director-guide/>
+- **GitHub**：<https://github.com/jeyu54217/seedance2-director-guide>
 
-## 🚀 Project Structure
+## 建置
 
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```bash
+npm install
+node build.mjs        # → dist/index.html
+open dist/index.html
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+無 dev server、無 hot reload、無 linter。改完跑 build 再看。
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+## 結構
 
-Static assets, like favicons, can be placed in the `public/` directory.
+```
+src/content/docs/
+├── 01-basics/        Q1–Q8   擴散模型基礎（DiT, VAE, CFG, Flow Matching）
+├── 02-seedance/      Q9–Q18  Seedance 2.0 特性（多模態融合、雙分支、@標籤、Storyboard）
+├── 03-diagnosis/     Q19–Q31 問題診斷（閃爍、肢體融化、唇形同步、物理失敗等 13 題）
+└── 04-workflow/      實戰工作流（場景 Preset、節點速查、限制總表、論文路線圖）
+```
 
-## 🧞 Commands
+## 授權
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+CC0 — 內容以 [Creative Commons Zero](https://creativecommons.org/publicdomain/zero/1.0/) 釋出。
