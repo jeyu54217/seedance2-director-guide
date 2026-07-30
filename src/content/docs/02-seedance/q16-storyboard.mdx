@@ -1,47 +1,69 @@
 ---
 title: 丟九宮格 storyboard 給 Seedance——它真的看得懂嗎？
-description: Seedance 2.0 內部有鏡頭分解（Shot Decomposition）步驟——解析 panel 序列、讀取文字標註、自動推斷運鏡
+description: 從 Seedance 1.0 公開架構（MM-RoPE 多 shot 序列）推論 storyboard 的可能運作原理，並對照學術界 STAGE、ShotAdapter 等論文的已知做法
 sidebar:
   order: 8
 ---
 
 ## 一句話
 
-Seedance 2.0 內部有鏡頭分解（Shot Decomposition）步驟——不是把 storyboard 當「一張圖」，而是先解析 panel 序列、讀取文字標註，再從 panel 之間的空間差異自動推斷運鏡和過渡。
+Seedance 論文未揭露 storyboard 圖片的內部解析步驟。從公開架構推論：多格 storyboard 提供的是**多時間點的視覺錨點**，模型在 denoising 過程中同時看到所有 panel 的視覺條件，Temporal Attention 在時間軸上補出 panel 之間的過渡——包括運鏡。
 
-## 官方證據
+## 單張參考圖能做到的極限
 
-ByteDance 官方 launch 頁面（seed.bytedance.com）明確寫著：**"It can even directly reference text-based storyboards"**。官方 prompt 範例進一步列出具體提取的內容：「Refer to the shooting script in @Image 1, and draw on the storyboard, **shot scale, camera movement, visuals and copy** in @Image 1」——"copy" 就是 storyboard 上的文字標註。
+單張 mood board 只有一個視覺條件。模型生成每一幀時，看到的都是同一組顏色、光影、構圖訊號。你可以用它鎖定角色外觀和風格，但無法用它控制「第 3 秒要切到 close-up」。
 
-## 推論機制：四步驟
+多格 storyboard 每一格對應不同的時間點。Panel 1 是 wide shot，panel 2 是 close-up，panel 3 是低角度——模型拿到的不是一個條件，而是多個時間點的多個條件。這是 storyboard 比單張圖更有控制力的根本原因。
 
-**Step 1 — 影像理解層解析 storyboard**：分離每個 panel 的視覺特徵（構圖、角色位置、色調、光影）+ OCR/VLM 讀取 panel 上的文字標註（鏡位如 CU/WS、運鏡方向如 push-in/pan、時間點）+ 建立 panel 之間的空間關係與序列順序。
+## Seedance 論文實際寫了什麼
 
-**Step 2 — 鏡頭分解（Shot Decomposition）**：nemovideo.com 的 prompt 指南揭露了一個關鍵行為：「Seedance 2.0 doesn't process your prompt as one big block of text. **It reads your prompt and breaks it down into a sequence of distinct camera shots**——acting like a storyboard artist before generating a single frame。」每個 panel 對應一個 shot。
+**Seedance 1.0**（[arxiv:2506.09113](https://arxiv.org/abs/2506.09113)）描述的是架構層面的 multi-shot 能力。核心設計是 Multishot MM-RoPE——一種位置編碼，讓多個 shot 的 visual token 和 text token 在同一個序列中交錯排列，每個 shot 有自己的 caption。Denoising 時，模型同時看到所有 shot 的資訊，不是逐 shot 分開生成。跨 shot 角色一致性的來源就是這個——不同 shot 的 visual token 在 attention 層有直接交換，不需要靠 prompt 來維持。
 
-**Step 3 — 與 Prompt 文字融合**：Prompt 中的時序描述（0-1 秒、1 秒開始）映射到對應 panel。沒有 prompt 文字時，模型從 panel 佈局自行推斷過渡方式和節奏。
+**Seedance 2.0**（[arxiv:2604.14148](https://arxiv.org/abs/2604.14148)）產品頁面寫 "It can even directly reference text-based storyboards"，官方 prompt 範例列出提取項目：shot scale、camera movement、visuals、copy（storyboard 上的文字標註）。但論文中沒有任何內部解析步驟的描述——這是一篇 system/evaluation paper，不是 architecture paper。
 
-**Step 4 — DiT 去噪生成**：Cross-Attention 在每個 shot 段查閱對應 panel 的 K/V，Temporal Attention 平滑 shot 之間的過渡。
+## 為什麼給 storyboard 會自動產生運鏡
 
-## 為什麼只給 storyboard 就會產生運鏡變換？
+不需要發明 Shot Decomposition 模組來解釋。從已知架構可以推論：
 
-Panel 1 是 wide shot、panel 2 是 close-up——要從 panel 1 走到 panel 2，**中間唯一的連續路徑就是 push-in**。模型不是「被指定」做 push-in，而是 panel A 到 panel B 的空間差異本身就是 conditioning signal——運鏡是被推斷的，不是被指定的。nemovideo 的結論：「No camera line = the model decides. Sometimes it gets lucky. Most of the time, it doesn't.」
+Seedance 1.0 的 multi-shot 序列中，每個 shot 的 visual token 帶著自己的 3D RoPE 時間位置編碼。當你餵 storyboard 的 panel 1（wide shot）和 panel 2（close-up），它們被當成不同時間點的 visual condition。Temporal Attention（[Q4：時空注意力的分工](../q04-spatial-temporal/)）在生成過渡幀時，看到的 condition 從「wide shot 構圖」漸變到「close-up 構圖」。模型訓練資料中 wide→close-up 的典型過渡就是 push-in——所以它自動生成 push-in。
 
-## Storyboard vs. 純視覺風格參考（mood board）
+運鏡來源是**預訓練視覺先驗**（[Q14](../q14-camera-motion/)），storyboard 的角色是給這個先驗提供明確的起點和終點。
 
-| | 純視覺風格參考（單張 mood board） | Storyboard（多格分鏡） |
+Panel 之間的過渡不是被「指定」的，是被「補出來」的。這就是為什麼沒有寫任何運鏡術語，輸出仍然會有鏡頭運動。
+
+## 學術界怎麼做 storyboard-to-video
+
+Seedance 沒寫的，學術界有公開做法。目前兩條路線：
+
+| 路線 | 做法 | 代表論文 |
 |---|---|---|
-| 模型看到的 | 一張圖的全局特徵 | 多格 panel 序列 + 文字標註 |
-| 提取的資訊 | 色調、光影、角色外觀 | 鏡位、運鏡方向、場景順序、copy 文字 |
-| 運鏡來源 | 預訓練先驗（Q14） | panel 間空間差異 → explicit conditioning |
-| 可控性 | 低（模型自行決定） | 中高（panel 提供 explicit shot plan） |
+| LLM-based planning | 外部 LLM 先把文字拆成 shot plan（鏡位、運鏡、時長），影片模型照 plan 生成 | STAGE (CVPR 2026), CoAgent |
+| Architecture-level multi-shot | 在 DiT 內部處理 shot 邊界，denoising 時學 shot 之間的關係 | ShotAdapter (CVPR 2025), Seedance 1.0 |
 
-:::caution[⚠️ 誠實揭露]
-Shot Decomposition 的內部步驟為基於 nemovideo.com 社群分析和產品行為的推論。Seedance 論文未描述 storyboard 的內部解析機制。
+**LLM-based**——STAGE（[arxiv:2512.12372](https://arxiv.org/abs/2512.12372)）：Director Agent（LLM）把故事展開成結構化 shot plan，每個 shot 標明 description、camera angle、shot scale。STEP2 模型為每個 shot 生成 start frame 和 end frame，再用 I2V 模型填滿中間。
+
+**Architecture-level**——ShotAdapter（[arxiv:2505.07652](https://arxiv.org/abs/2505.07652)）：在 pre-trained DiT 中加入 transition token（讓模型學會 shot 之間的 cut）和 local attention masking（限制 text token 只 attend 自己的 visual token，防止跨 shot prompt 汙染）。不需要外部 LLM。
+
+Seedance 1.0 論文的描述更接近後者（原生 multi-shot、架構內建），但 2.0 的 "directorial reasoning" 說法暗示可能混合了 LLM-based planning。**目前沒有公開資訊確認 2.0 的具體實作。**
+
+:::tip[🎬 導演要點]
+- **Storyboard 的價值是提供多時間點的構圖錨點**——不是風格參考。角色外觀統一交給 @ 角色參考圖（[Q11](../q11-at-tags/)）
+- Panel 之間的空間差異會影響輸出運鏡，但模型是推斷，不是執行指令。想精確控制，在 prompt 中明確寫運鏡術語（[Q14](../q14-camera-motion/)）
+- 實戰技巧見 [Q17：Storyboard 實戰](../q17-storyboard-practice/)——面板數、文字滲入防範、與角色圖的分工
 :::
 
-:::note[📖]
-Seedance 2.0 Official Launch (seed.bytedance.com) — text-based storyboard 支援。
+:::caution[⚠️ 誠實揭露]
+Seedance 1.0/2.0 論文均未描述 storyboard 圖片的內部解析機制（panel 分割、OCR 文字讀取、Shot Decomposition 步驟）。「為什麼給 storyboard 會自動產生運鏡」段落為基於 Seedance 1.0 公開架構（MM-RoPE multi-shot 序列 + Temporal Attention 幀間平滑）的推論，非官方確認的實作細節。學術界做法（STAGE、ShotAdapter、CoAgent）引用自公開論文，不等於 Seedance 內部實作。
+:::
 
-nemovideo.com prompt 指南 — Shot Decomposition 行為描述。
+:::note[📖 引用論文]
+Seedance 1.0: Exploring the Boundaries of Video Generation Models — [arxiv:2506.09113](https://arxiv.org/abs/2506.09113)
+
+Seedance 2.0: Advancing Video Generation for World Complexity — [arxiv:2604.14148](https://arxiv.org/abs/2604.14148)
+
+STAGE: Storyboard-Anchored Generation for Cinematic Multi-shot Narrative (CVPR 2026) — [arxiv:2512.12372](https://arxiv.org/abs/2512.12372)
+
+ShotAdapter: Text-to-Multi-Shot Video Generation with Diffusion Models (CVPR 2025) — [arxiv:2505.07652](https://arxiv.org/abs/2505.07652)
+
+CoAgent: Collaborative Planning and Consistency Agent for Coherent Video Generation — [arxiv:2512.22536](https://arxiv.org/abs/2512.22536)
 :::
