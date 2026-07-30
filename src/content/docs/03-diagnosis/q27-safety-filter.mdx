@@ -1,0 +1,74 @@
+---
+title: 同一個 prompt 昨天可以今天不行、臉一直被擋（Safety Filter Instability）——MPA 後的審查機制
+description: MPA 事件後 safety filter 從關鍵字過濾升級為嵌入 RLHF 的 LLM 意圖判斷，37% 呼叫被拒，過濾標準每日波動
+sidebar:
+  order: 3
+---
+
+## 一句話
+
+2026 年 2 月 MPA 事件後，Safety Filter 從靜態關鍵字過濾升級為嵌入 RLHF 推理的 LLM 意圖判斷——同一個 prompt 昨天能過、今天被擋，因為 filter 不是規則引擎，是動態模型。
+
+## WHY：為什麼審查標準每天都在變？
+
+### 從關鍵字過濾到意圖判斷
+
+傳統內容過濾掃描 prompt 關鍵字（"nude"、"violent"、"blood"）——黑名單命中即拒絕。MPA（Motion Picture Association）施壓後，ByteDance 部署新方案：
+
+**不是過濾「裸體」這個詞，是用 LLM 判斷整段 prompt 的意圖是否可能產生敏感內容。**
+
+[Q15：情緒理解](../02-seedance/q15-emotion/) 描述 Seedance 2.0 的 Text Encoder 能理解語意——同樣的語意理解能力，在審查場景變成意圖判斷引擎。ExpCLIP/TalkCLIP 的情緒語意空間被用來判斷「這個 prompt 想做什麼」。
+
+### Safety Reward 不是外加過濾層
+
+[Q12：三階段訓練](../02-seedance/q12-training/) 的 RLHF 階段中，safety reward model 的權重**直接嵌入推理 pipeline**——不是外加的後處理過濾器，而是生成流程的一部分。這解釋三個現象：
+
+1. **同日波動**：不同時段 safety reward 權重可能不同（A/B testing）
+2. **良性誤傷**：Segmind 分析 4,367 次呼叫，**37% 被拒**——大量純良性 prompt 被標記
+3. **不可預測**：昨天通過的 prompt 今天被擋——safety reward 更新了，不是你的 prompt 變了
+
+### 為什麼真人臉特別容易被擋？
+
+Filter 核心策略是 **pattern-matching 已知身份**，不是阻擋所有 realistic faces。真實人物（演員、公眾人物）的臉部 embedding 在訓練資料中已建立對應——filter 直接命中。原創角色（不存在於訓練資料中的臉）無預存 embedding，通過率較高。
+
+## HOW：社群應對策略
+
+### 原創角色優先
+
+用 AI 生成的原創角色參考圖（非真人照片、非公眾人物）——filter 無預存 identity embedding 可匹配。
+
+### 網格覆蓋法
+
+在參考圖疊加細網格線（1–2px grid overlay），干擾 face detection 的 CNN backbone 但不影響生成品質。社群發現的 workaround——利用 CNN 對規則網格 pattern 的敏感性。
+
+### 平台差異
+
+不同 API 端點 filter 嚴格度不同：
+
+| 平台 | filter 嚴格度 |
+|------|-------------|
+| fal.ai | 最嚴格 |
+| Dreamina | 中等 |
+| TopView | 較寬鬆 |
+| Higgsfield | 最寬鬆 |
+
+### 替代工具
+
+當 filter 完全無法通過時：Kling 3.0（內容政策較寬鬆）、Runway Gen-4（獨立審查標準）。
+
+:::tip[🎬 導演要點]
+
+- **用原創角色，不要碰真實人臉**——這是通過率差異，不是創作建議
+- 同一個 prompt 今天被擋 → 明天再試——不是 prompt 的問題，是 filter 權重更新了
+- 平台 filter 不同——fal.ai 被擋的 prompt，Higgsfield 可能直接過
+- 網格覆蓋法是 workaround，不是保證——filter 更新後可能失效
+
+:::
+
+:::note[📖 引用論文]
+[Seedance 2.0 Model Card §1–2](https://arxiv.org/abs/2604.14148) — 多模態架構與 safety 機制。
+
+[Seedance 1.5 Pro §3–4](https://arxiv.org/abs/2512.13507) — 三階段訓練與 RLHF reward 模型架構。
+
+[Segmind Safety Filter Analysis (2026)](https://segmind.com) — 4,367 次 API 呼叫統計分析。
+:::

@@ -1,0 +1,62 @@
+---
+title: 上傳的音樂被參考影片蓋掉（Audio Track Contamination）——影片內嵌音軌的優先級覆蓋
+description: 參考影片內嵌音軌與 visual branch 已有 latent 空間 temporal alignment，獨立上傳音訊權重被壓過
+sidebar:
+  order: 2
+---
+
+## 一句話
+
+DiT 統一架構中，參考影片內嵌音軌與 visual branch 已有 latent 空間的 temporal alignment——獨立上傳音訊不具備這個對齊，在 attention 權重競爭中被覆蓋。
+
+## WHY：為什麼上傳的配音被參考影片雜音蓋掉？
+
+[Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) 的統一 DiT 同時處理文字、影像、音訊——所有模態共用同一個 latent 空間。好處：多模態資訊可在 attention 層自由互動。代價：**同一模態有兩個來源時，沒有明確的仲裁機制。**
+
+[Q10：雙分支架構](../02-seedance/q10-dual-branch/) 的 Audio Branch 處理兩類輸入：
+
+1. 參考影片的內嵌音軌——在 latent 空間中與 visual branch 已有 [Q10 的時間對齊](../02-seedance/q10-dual-branch/)（temporal alignment）
+2. 獨立上傳的音訊檔（`@Audio1`）——單獨編碼，沒有 visual latent 錨點
+
+DiT 的 attention 層融合多模態時，傾向保留已有跨模態關聯的訊號。內嵌音軌與畫面的 latent 對應關係已存在（影片壓縮時一併編碼），獨立上傳音訊要從零建立這個對應。
+
+結果：**內嵌音軌權重 > 獨立上傳音訊。** 乾淨配音被參考影片環境雜音蓋掉——不是音量問題，是 latent 空間的權重競爭。
+
+## HOW：機制細節
+
+### 為什麼是「覆蓋」而不是「混合」？
+
+DiT 的 Cross-Attention 在相同模態區間使用 softmax 歸一化——兩個音訊來源的 attention 權重加總為 1。已對齊的內嵌音軌拿走大部分權重，獨立音訊訊號被擠出有效範圍。不是混合，是強者吃掉弱者。
+
+### 解法：上傳前移除音軌
+
+完全移除音軌（靜音），不能只調低音量。工具：`ffmpeg -i input.mp4 -an output.mp4`（`-an` = no audio stream）。
+
+### 解法：兩階段生成
+
+參考影片的運鏡和音訊都需保留時：
+1. 第一輪：靜音影片 → 取得運鏡結構和 visual style
+2. 第二輪：`@Audio1` 上傳乾淨音訊，搭配第一輪輸出的畫面 reference
+
+### 工具對照
+
+| 工具 | 處理方式 |
+|------|---------|
+| ComfyUI | AudioScheduler 節點設定 `audio_priority = "upload"` |
+| Seedance 原生 | `@Audio1` 優先級 flag（`priority:high`），但無法保證覆蓋內嵌音軌 |
+
+:::tip[🎬 導演要點]
+
+- **上傳參考影片前先靜音。** 不是建議，是 SOP
+- 不要期待 `@Audio1` 能蓋過影片內嵌音軌——latent 空間的優先級不用音量解決
+- 需要保留運鏡 + 換音軌 → 分兩次生成
+
+:::
+
+:::note[📖 引用論文]
+[Seedance 2.0 Model Card §1–2](https://arxiv.org/abs/2604.14148) — 多模態 DiT 架構與音訊處理。
+
+[Seedance 1.5 Pro §3.2](https://arxiv.org/abs/2512.13507) — Audio Branch 與 temporal alignment 機制。
+
+[DiT (Peebles & Xie, ICCV 2023, §3.1)](https://arxiv.org/abs/2212.09748) — Cross-Attention softmax 歸一化行為。
+:::

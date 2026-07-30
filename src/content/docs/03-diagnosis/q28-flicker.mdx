@@ -2,7 +2,7 @@
 title: 畫面一直閃、顏色太豔（Flicker & Oversaturation）——閃爍與過飽和
 description: Temporal Attention 曝光不一致導致閃爍，CFG 外推過頭導致過飽和——兩種最常見的視覺品質問題
 sidebar:
-  order: 2
+  order: 4
 ---
 
 ## 一句話
@@ -51,7 +51,7 @@ WaveSpeed 的社群診斷將閃爍細分為四種子類型，每種對應不同�
 
 **先修閃爍，再調色彩。** FreeInit + Euler + Steps ≥ 25 解決閃爍。RescaleCFG 0.5–0.7 解決過飽和。
 
-慢速運鏡 > 快速運鏡——[Q28：背景漂移](q23-background-drift/) 和 [Q27：快速運動崩潰](q27-fast-motion/) 也都是同一個 Temporal Attention 窗口限制的受害者。
+慢速運鏡 > 快速運鏡——[Q23：背景漂移](q23-background-drift/) 和 [Q29：快速運動崩潰](q29-fast-motion/) 也都是同一個 Temporal Attention 窗口限制的受害者。
 
 :::
 

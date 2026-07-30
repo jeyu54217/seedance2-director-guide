@@ -2,7 +2,7 @@
 title: 動作一快，人跟東西就消失（Fast Motion Warping）——快速運動的畫面崩潰
 description: Temporal Attention 在高運動幅度時 token 匹配失效——O(n²) 窗口截斷 + 位置編碼大位移失效
 sidebar:
-  order: 9
+  order: 11
 ---
 
 ## 一句話
@@ -29,7 +29,7 @@ sidebar:
 - **慢速 dolly-in 代替快速 zoom**：同樣是靠近主體，dolly-in（物理移動攝影機）在幀間位移分佈均勻，zoom（改變焦距）造成邊緣區域的非線性位移
 - 避免快速變焦和快速 whip pan——這些運鏡在訓練數據中本來就稀少
 - 在 prompt 中指定「slow, continuous movement, consistent speed」——不要只描述動作內容，也要描述動作速度
-- [Q28：背景漂移](q23-background-drift/) 的解法也適用：CameraCtrl + FreeInit + Tile ControlNet 三連提供 explicit 空間約束
+- [Q23：背景漂移](q23-background-drift/) 的解法也適用：CameraCtrl + FreeInit + Tile ControlNet 三連提供 explicit 空間約束
 
 :::tip[🎬 導演要點]
 

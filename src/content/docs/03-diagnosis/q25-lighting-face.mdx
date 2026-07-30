@@ -1,0 +1,63 @@
+---
+title: 光一暗臉就變了（Low-Light Identity Drift）——暗場景下的 Cross-Attention 失效
+description: 暗場景中 VAE latent 資訊密度不足，Cross-Attention Query 找不到足夠的 Key/Value 鎖定臉部特徵
+sidebar:
+  order: 1
+---
+
+## 一句話
+
+暗場景的 VAE latent 資訊密度太低，Cross-Attention 的 Query 找不到足夠的 Key/Value 來鎖定臉部特徵——模型只能在黑暗中「猜」一張臉。
+
+## WHY：為什麼光一暗臉就變？
+
+[Q4：注意力機制](../01-basics/q04-attention/) 的 Cross-Attention 是模型接收外部條件的入口：文字 token、參考圖 token 透過 Query 去查閱當前生成 token 的 Key/Value，決定畫面內容。
+
+前提：**token 裡要有足夠的可見特徵讓 Query 匹配。**
+
+[Q2：潛在空間](../01-basics/q02-latent-space/) 的 VAE 將影像壓縮 8 倍（f=8）。亮部細節——邊緣、紋理、顏色對比——在 latent 中保留為高強度訊號。暗部相反：低亮度區域經過感知壓縮後，channel 差異趨近於零，latent 幾乎只剩雜訊。
+
+**暗場景 = 資訊貧乏的 latent token。**
+
+Cross-Attention 在這些 token 上運作時，Query 找不到夠強的 Key/Value 錨定身份特徵。模型退而求其次——從訓練資料中「平均化」出一個最像人臉的東西。光一暗，臉就不是原來那張臉了。
+
+不是「模型忘記參考圖」，而是**參考圖的資訊在暗場景 token 中根本投不進去。**
+
+## HOW：機制細節
+
+### 亮度與 Cross-Attention 權重
+
+暗場景的 attention map 有兩個退化特徵：
+- **權重分散**：Query 無法聚焦特定 Key，attention 分佈趨近 uniform——每個參考圖 token 被平均加權
+- **對比度消失**：Value 向量間的差異在低 latent 強度下被壓平，輸出等同 noise-averaged 結果
+
+這和 Temporal Attention 的時序資訊不足是同一類問題的空間版本——資訊不足時，模型輸出 regress to the mean。
+
+### 多光照參考圖
+
+提供兩張以上不同光照條件的參考圖（`@image1` 正面亮光 + `@image2` 側面暗光），讓 Cross-Attention 在兩種 latent 強度區間都有 Key/Value 可匹配。
+
+### Prompt 光照描述
+
+[Q15：情緒理解](../02-seedance/q15-emotion/) 的機制暗示：Prompt 中的光照描述（"soft studio glow, consistent key light"）透過 Text Encoder 映射為對應的 latent conditioning，比模型自己處理暗場景更可控。
+
+### 替代方案：後製調暗
+
+亮光環境生成影片後，後製降低亮度。缺點：暗部無物理正確的光衰減，真實感略降。優點：面部一致性 100% 保留。安全優先的 trade-off。
+
+:::tip[🎬 導演要點]
+
+- **不要讓模型在黑暗中猜臉。** 暗場景生成 = 資訊不足的賭博
+- 至少給兩張不同光照的參考圖——一張亮、一張暗
+- 亮光生成 + 後製調暗 > 直接生成暗場景（犧牲一點真實感，換面部一致性）
+- Prompt 寫光源方向與強度（"rim light from left, soft fill at 30%"），不要只寫 "dark scene"
+
+:::
+
+:::note[📖 引用論文]
+[Seedance 2.0 Model Card §1–2](https://arxiv.org/abs/2604.14148) — 多模態架構與 Cross-Attention 機制。
+
+[LDM (Rombach et al., CVPR 2022, §3, §4.1)](https://arxiv.org/abs/2112.10752) — VAE 感知壓縮與 latent 資訊密度分佈。
+
+[DiT (Peebles & Xie, ICCV 2023, §3.1)](https://arxiv.org/abs/2212.09748) — Cross-Attention 條件化與 attention map 行為。
+:::
