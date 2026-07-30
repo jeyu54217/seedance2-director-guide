@@ -29,7 +29,7 @@ const SECTIONS = {
     type: 'workflow',
     summaries: {
       'comfyui-nodes': '🎛️ ComfyUI 節點速查（含具體參數）',
-      'scene-presets': '🎬 四種短劇場景標準組合（含完整參數）',
+      'scene-presets': '🎬 六種短劇場景標準組合（含完整參數）',
       'limitations': '⚠️ Seedance 2.0 的關鍵限制（附 Part 1–2 出處）',
       'paper-roadmap': '📚 論文閱讀路線圖（6 層，附 Q 對照）',
     },
@@ -157,18 +157,18 @@ const PAGE_OPEN = `<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'neutral',securityLevel:'loose'});</script>
 <meta name="theme-color" content="#faf9f6">
-<meta name="description" content="AI 仿真人劇導演的進階技術知識手冊 — 理解擴散模型、DiT、Flow Matching 底層原理，精準操控 Seedance 2.0 工作流。15+ 篇論文導讀，ComfyUI 實戰節點速查。">
+<meta name="description" content="AI 仿真人劇導演的進階技術知識手冊 — 理解擴散模型、DiT、Flow Matching 底層原理，精準操控 Seedance 2.0 工作流。18 篇論文導讀，6 場景 Preset，13 ComfyUI 節點速查。">
 <meta name="keywords" content="Seedance 2.0, AI video generation, diffusion model, DiT, Flow Matching, ComfyUI, director guide, 擴散模型, 影片生成, 導演">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="https://jeyu54217.github.io/seedance2-director-guide/">
 <meta property="og:title" content="Seedance 2.0 導演技術背景學習指引">
-<meta property="og:description" content="AI 仿真人劇導演的進階技術知識手冊 — 理解底層模型，精準操控工作流。15+ 篇論文導讀，ComfyUI 實戰。">
+<meta property="og:description" content="AI 仿真人劇導演的進階技術知識手冊 — 理解底層模型，精準操控工作流。18 篇論文導讀，6 場景 Preset，ComfyUI 實戰。">
 <meta property="og:url" content="https://jeyu54217.github.io/seedance2-director-guide/">
 <meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Seedance 2.0 導演技術背景學習指引">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"TechArticle","headline":"Seedance 2.0 導演技術背景學習指引","author":{"@type":"Person","name":"Claude Fable 5"},"datePublished":"2026-07-25","inLanguage":["zh-TW","zh-CN"]}
+{"@context":"https://schema.org","@type":"TechArticle","headline":"Seedance 2.0 導演技術背景學習指引","author":{"@type":"Person","name":"Claude Fable 5"},"datePublished":"2026-07-30","inLanguage":["zh-TW","zh-CN"]}
 </script>
 <title>Seedance 2.0 導演技術背景學習指引</title>
 <style>${CSS}</style>
@@ -178,7 +178,7 @@ const PAGE_OPEN = `<!DOCTYPE html>
   <h1>🎬 Seedance 2.0 導演技術背景學習指引</h1>
   <p class="sub">針對 AI 仿真人劇導演的進階技術知識手冊 — 理解底層模型，精準操控工作流</p>
   <div class="meta">
-    <span>📅 2026-07-25</span><span>🎯 非技術背景友善</span><span>📖 15+ 篇論文導讀</span><span>🔧 ComfyUI 實戰</span>
+    <span>📅 2026-07-30</span><span>🎯 非技術背景友善</span><span>📖 18 篇論文導讀</span><span>🔧 ComfyUI 實戰</span>
   </div>
 </header>
 <div class="toolbar">
@@ -191,8 +191,8 @@ const PAGE_OPEN = `<!DOCTYPE html>
 const PAGE_CLOSE = `
 </main>
 <footer>
-  <p>由 Claude Fable 5 整理 · 來源：<a href="https://share.gemini.google/Jqa3sF8Vg28S">Gemini Deep Research</a> + 15+ 篇學術論文 + Reddit 社群討論</p>
-  <p style="margin-top:.3rem">內容以 <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a> 釋出 · 最後更新 2026-07-25</p>
+  <p>由 Claude Fable 5 整理 · 來源：<a href="https://share.gemini.google/Jqa3sF8Vg28S">Gemini Deep Research</a> + 18 篇學術論文 + Reddit 社群討論</p>
+  <p style="margin-top:.3rem">內容以 <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a> 釋出 · 最後更新 2026-07-30</p>
 </footer>
 <script>
 const T2S={"著":"着","體":"体","對":"对","會":"会","們":"们","來":"来","開":"开","關":"关","機":"机","後":"后","畫":"画","聲":"声","聽":"听","點":"点","學":"学","說":"说","長":"长","門":"门","間":"间","見":"见","頭":"头","萬":"万","裡":"里","兒":"儿","氣":"气","時":"时","過":"过","為":"为","嗎":"吗","樣":"样","麼":"么","國":"国","動":"动","種":"种","實":"实","從":"从","這":"这","當":"当","還":"还","沒":"没","電":"电","話":"话","視":"视","車":"车","東":"东","經":"经","網":"网","飛":"飞","馬":"马","鳥":"鸟","魚":"鱼","龍":"龙","僅":"仅","單":"单","層":"层","將":"将","無":"无","極":"极","擇":"择","數":"数","據":"据","確":"确","標":"标","準":"准","導":"导","師":"师","團":"团","隊":"队","際":"际","圍":"围","雜":"杂","亂":"乱","潰":"溃","爛":"烂","隱":"隐","穩":"稳","態":"态","歷":"历","異":"异","衛":"卫","護":"护","讓":"让","調":"调","設":"设","計":"计","試":"试","認":"认","識":"识","誤":"误","證":"证","評":"评","論":"论","該":"该","誰":"谁","許":"许","請":"请","謝":"谢","讚":"赞","議":"议","變":"变","爭":"争","權":"权","參":"参","觀":"观","圖":"图","線":"线","於":"于","與":"与","寫":"写","處":"处","雖":"虽","壓":"压","縮":"缩","擴":"扩","構":"构","連":"连","進":"进","運":"运","驗":"验","顯":"显","預":"预","類":"类","風":"风","區":"区","別":"别","剛":"刚","業":"业","嚴":"严","質":"质","創":"创","節":"节","術":"术","藝":"艺","藥":"药","響":"响","優":"优","勢":"势","價":"价","塊":"块","紋":"纹","錄":"录","鏡":"镜","鍵":"键","鏈":"链","錯誤":"错误","輸入":"输入","輸出":"输出","選擇":"选择","執行":"执行","應用":"应用","繼續":"继续","歷史":"历史","範圍":"范围"}

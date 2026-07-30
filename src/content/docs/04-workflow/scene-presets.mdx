@@ -1,13 +1,57 @@
 ---
-title: 四種短劇場景標準組合
-description: 對白近景、打鬥動作、大運鏡、多角色——ComfyUI 與 Seedance Prompt 完整參數
+title: 六種短劇場景標準組合
+description: 對白近景、打鬥動作、大運鏡、多角色、暗光、情緒——ComfyUI 與 Seedance Prompt 完整參數與技術原理
 sidebar:
-  order: 2
+  order: 1
 ---
 
-| 場景 | ComfyUI | Seedance Prompt | 關鍵數字 |
-|---|---|---|---|
-| **對白近景** | `IP-Adapter FaceID`(0.85) + `DWPose Face` + `RescaleCFG`(0.6) | `@image1`（高清正面頭像）+ `[00:01-00:03]` 時間標籤 | ≤12詞/10s；≤20詞/15s；句子間加停頓錨點 |
-| **打鬥／動作** | `DWPose Full` + `Depth V2`（雙 ControlNet, str=0.55, end=0.7） + `RescaleCFG`(0.6) | `@video1`（真人動作參考） | CFG ≤ 7；禁用否定句 |
-| **大運鏡** | `CameraCtrl` + `FreeInit` + `Tile ControlNet` + Euler sampler | `@image1` + `@video1`（運鏡軌跡） | Steps ≥ 25；FreeInit 預設參數 |
-| **多角色** | `Regional Prompting` + SAM mask + 每個角色獨立 `IP-Adapter` | `@image1` + `@image2` 色系差異最大化 | ≤2 角色；純色背景特寫 |
+## 一句話
+
+每個 preset 不是隨手湊的參數——背後是一組 DiT 架構機制的對應解法。CFG ≤ 7、RescaleCFG 0.5–0.7、Steps ≥ 25 是 [Q5：CFG](../01-basics/q05-cfg/) 和 [Q7：Flow Matching](../01-basics/q07-flow-matching/) 的跨場景底線，其餘參數按場景的技術挑戰疊加。
+
+## 場景 Preset
+
+| 場景 | 技術挑戰（WHY） | ComfyUI | Seedance Prompt | 原理見 |
+|---|---|---|---|---|
+| **對白近景**（含唇形同步） | Cross-Attention 鎖定臉部 + text-driven phoneme timing。對白文字才是唇形 ground truth，上傳音訊只是語音風格參考 | `IP-Adapter FaceID`(0.85) + `FaceDetailer`(denoise 0.2–0.35) + `RescaleCFG`(0.6) | `@image1`（純色背景正面特寫）+ `[00:01-00:03]` 時間標籤 + 句子間加停頓錨點 | [Q4](../01-basics/q04-attention/), [Q23](../03-diagnosis/q23-identity-drift/), [Q25](../03-diagnosis/q25-lip-sync/) |
+| **打鬥／動作** | 高 CFG SNR 崩潰砍掉肢體 + Temporal Attention 窗口在快速運動時跟丟。需前段幾何約束 + 後段放手 | `DWPose Full` + `Depth V2` 雙 ControlNet（str=0.55, end=0.7）+ `RescaleCFG`(0.6) | `@video1`（真人動作參考）；避免極端肢體描述；**禁用否定句** | [Q24](../03-diagnosis/q24-limb-melting/), [Q27](../03-diagnosis/q27-physics-failure/), [Q29](../03-diagnosis/q29-fast-motion/) |
+| **大運鏡** | Temporal Attention 窗口在大位移時失效，背景 token 移出匹配範圍。需 explicit camera path + 空間鎖定 | `CameraCtrl` + `FreeInit`（預設）+ `Tile ControlNet` + Euler sampler + Steps ≥ 25 | `@image1` + `@video1`（運鏡軌跡）；不寫運鏡術語時預設有輕微運鏡（視覺先驗），要靜止寫 "static shot, locked-off camera" | [Q14](../02-seedance/q14-camera-motion/), [Q30](../03-diagnosis/q30-background-drift/) |
+| **多角色** | Cross-Attention softmax 路由在色系接近時混淆——角色 A 特徵滲入角色 B。需 spatial localized injection | `Regional Prompting` + SAM 預分割 + 每個角色獨立 `IP-Adapter`（weight 各自調整） | `@image1` + `@image2` 色系差異最大化（紅 vs 藍 ≫ 紅 vs 橘）；純色背景特寫；≤2 角色 | [Q11](../02-seedance/q11-at-tags/), [Q28](../03-diagnosis/q28-feature-bleeding/) |
+| **暗光場景** | VAE f=8 壓縮使暗部 latent 資訊密度趨近零——Cross-Attention Query 找不到夠強的 Key/Value 錨定臉部 | `IP-Adapter FaceID`（多光照參考圖：亮+暗）+ `RescaleCFG`(0.6) | `@image1`（正面亮光）+ `@image2`（側面暗光）；Prompt 寫光源方向與強度（"rim light from left, soft fill at 30%"），不只寫 "dark scene" | [Q2](../01-basics/q02-latent-space/), [Q19](../03-diagnosis/q19-lighting-face/) |
+| **情緒表演** | CLIP 從預訓練中學會情緒文字→臉部視覺特徵的映射，但抽象標籤（"開心"）精度低於具體動作描述（"嘴角上揚、眉毛抬起"） | `IP-Adapter FaceID`（鎖定角色）+ FACS 參考圖作為額外 reference | 描述臉部動作而非情緒標籤（「嘴角微揚、眼神柔和」>「開心」）；混合情緒用連續向量疊加（「無奈的笑」= 嘴角上揚 + 眉頭微蹙 + 眼眶不激活） | [Q15](../02-seedance/q15-emotion/) |
+
+## 參數選取邏輯（HOW）
+
+每個場景的參數不是獨立決定的——它們按介入層分類疊加：
+
+1. **跨場景底線**（所有場景必備）：CFG ≤ 7 + RescaleCFG 0.5–0.7 + Steps ≥ 25 + Euler sampler
+2. **Cross-Attention 層**（臉部/身份控制）：IP-Adapter FaceID（0.8–0.9）+ FaceDetailer（denoise 0.2–0.35）——需要角色一致性時疊加
+3. **Residual Injection 層**（幾何/空間控制）：DWPose + Depth — ControlNet 走獨立 encoder，不走 Cross-Attention——需要肢體/物理約束時疊加
+4. **Temporal Attention 層**（時間一致性）：FreeInit + CameraCtrl + Tile ControlNet——需要運鏡/閃爍控制時疊加
+5. **Spatial Isolation 層**（區域隔離）：Regional Prompting + SAM——多角色場景專用
+
+每個 preset 是上述 1 + 場景所需層的組合。對白近景 = 1 + 2。打鬥 = 1 + 3。大運鏡 = 1 + 4。多角色 = 1 + 2 + 5。暗光 = 1 + 2 + prompt 策略。情緒 = 1 + 2 + prompt 策略。
+
+:::tip[🎬 導演要點]
+
+**從最簡單的組合開始，有問題再加層。** 對白近景先上 CFG ≤ 7 + RescaleCFG 0.6，臉不穩再加 IP-Adapter。不要一開始就全疊——每一層都增加生成時間。
+
+**ControlNet 介入時機是關鍵：** start=0.0, end=0.7——前段（框架建立期）介入幾何約束，後段（紋理細節期）放手。end 設太高（>0.8）會鎖死細節、畫面僵硬；end 設太低（<0.5）約束不夠、肢體還是會崩。
+
+**Prompt 端和 ComfyUI 端不是二選一，是疊加。** 暗光場景 = prompt 光照描述 + 多光照參考圖 + IP-Adapter。情緒場景 = prompt 臉部動作描述 + FACS 參考圖 + IP-Adapter。兩端互相補強，不互斥。
+
+:::
+
+:::note[📖 引用論文]
+
+[CFG (Ho & Salimans, 2022, §3)](https://arxiv.org/abs/2207.12598) — CFG 線性外推與甜蜜點。
+
+[RescaleCFG (Lin et al., WACV 2024, §3–4)](https://arxiv.org/abs/2305.08891) — 去噪後段安全閥。
+
+[ControlNet (Zhang et al., ICCV 2023, §3.1)](https://arxiv.org/abs/2302.05543) — 獨立 encoder + residual injection。
+
+[IP-Adapter (Ye et al., 2023, §3.2, §4)](https://arxiv.org/abs/2308.06721) — 解耦 cross-attention 身份注入。
+
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 多模態控制與 @ 標籤機制。
+
+:::

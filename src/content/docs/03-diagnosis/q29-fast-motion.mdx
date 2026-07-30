@@ -31,6 +31,8 @@ sidebar:
 - 在 prompt 中指定「slow, continuous movement, consistent speed」——不要只描述動作內容，也要描述動作速度
 - [Q30：背景漂移](q30-background-drift/) 的解法也適用：CameraCtrl + FreeInit + Tile ControlNet 三連提供 explicit 空間約束
 
+FreeInit 與 CameraCtrl 完整參數見 [Part 4：ComfyUI 節點速查](../04-workflow/comfyui-nodes/)，打鬥場景 preset 見 [Part 4：場景組合](../04-workflow/scene-presets/)。
+
 :::tip[🎬 導演要點]
 
 快速運動 = Temporal Attention 的極限測試。模型在慢速場景中表現好不是巧合——是訓練數據分佈和 O(n²) 窗口截斷的雙重結果。

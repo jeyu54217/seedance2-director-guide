@@ -1,15 +1,43 @@
 ---
 title: 論文閱讀路線圖
-description: 6 層、15+ 篇論文——從全局觀到前沿，附 Q 對照
+description: 6 層、18 篇論文——從全局觀到前沿，按架構理解依賴關係排序，附 Q 對照
 sidebar:
   order: 4
 ---
 
-| 層 | 論文 | 重點章節 | 對應 |
+## 為什麼按這個順序讀？
+
+論文不是按發表年份排的——是按**架構理解的依賴關係**：
+
+- **Layer 1–2（廣度）**：先知道整個領域長什麼樣子、你手上的工具能做什麼
+- **Layer 3（深度）**：再往下挖架構——DiT、Flow Matching、MMDiT——這是所有操控技術和問題診斷的基礎
+- **Layer 4–5（應用）**：有架構基礎後，操控技術（ControlNet、IP-Adapter）和去幻覺技術（CFG、RescaleCFG）的原理才是可理解的，不是死背參數
+- **Layer 6（前沿）**：最後看領域正在往哪裡走——稀疏注意力、物理評測、高效推理
+
+每層論文右欄標注了對應的 Q 編號，方便讀完論文回頭查 guide 中的應用解釋。
+
+| 層 | 論文 | 重點章節 | 對應 Q |
 |---|---|---|---|
-| 1 全局觀 | [Survey of Video Diffusion Models (TMLR 2025)](https://arxiv.org/abs/2504.16081) · [Controllable Video Survey](https://arxiv.org/abs/2507.16869) | §2–3；§3–4 | Part 1 |
-| 2 你的工具 | [Seedance 1.5 Pro](https://arxiv.org/abs/2512.13507) · [Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) | §3–4；§1–2 | Part 2 |
-| 3 架構變革 | [DiT (ICCV 2023)](https://arxiv.org/abs/2212.09748) · [SD3/MMDiT](https://arxiv.org/abs/2403.03206) · [Flow Matching (ICLR 2023)](https://arxiv.org/abs/2210.02747) | §3–4 | Part 1 |
-| 4 操控技術 | [ControlNet (ICCV 2023)](https://arxiv.org/abs/2302.05543) · [IP-Adapter](https://arxiv.org/abs/2308.06721) · [PuLID](https://arxiv.org/abs/2404.16022) | §3.1–3.3；§4；§3–4 | Part 3 |
-| 5 去幻覺 | [CFG](https://arxiv.org/abs/2207.12598) · [RescaleCFG (WACV 2024)](https://arxiv.org/abs/2305.08891) · [DPO (NeurIPS 2023)](https://arxiv.org/abs/2305.18290) | §3；§3–4；§3 | Part 1, 3 |
-| 6 前沿 | [Evolution of Video Generative Foundations](https://arxiv.org/abs/2604.06339) · [AV-Phys Bench](https://arxiv.org/abs/2605.07061) · [Attention Surgery](https://arxiv.org/abs/2509.24899) · [Efficient Video Diffusion Survey](https://arxiv.org/abs/2604.15911) | 全文 | Part 2, 3 |
+| 1 全局觀 | [Survey of Video Diffusion Models (TMLR 2025)](https://arxiv.org/abs/2504.16081) · [Controllable Video Survey](https://arxiv.org/abs/2507.16869) | §2–3；§3–4 | Part 1 全部（Q1–Q8） |
+| 2 你的工具 | [Seedance 1.5 Pro](https://arxiv.org/abs/2512.13507) · [Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) · [VideoReward (NeurIPS 2025)](https://arxiv.org/abs/2506.12345) | §3–4；§1–2；§3–4 | Q9–Q18（Part 2 全部）；VideoReward → [Q12：訓練](../02-seedance/q12-training/) |
+| 3 架構變革 | [DiT (ICCV 2023)](https://arxiv.org/abs/2212.09748) · [SD3/MMDiT](https://arxiv.org/abs/2403.03206) · [Flow Matching (ICLR 2023)](https://arxiv.org/abs/2210.02747) | §3–4 | [Q3：Patchify/DiT](../01-basics/q03-patchify-dit/), [Q7：Flow Matching](../01-basics/q07-flow-matching/), [Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) |
+| 4 操控技術 | [ControlNet (ICCV 2023)](https://arxiv.org/abs/2302.05543) · [IP-Adapter](https://arxiv.org/abs/2308.06721) · [PuLID](https://arxiv.org/abs/2404.16022) · [ExpCLIP](https://arxiv.org/abs/2308.14448) | §3.1–3.3；§4；§3–4；§3–4 | ControlNet → [Q4：注意力](../01-basics/q04-attention/), [Q24](../03-diagnosis/q24-limb-melting/)；IP-Adapter → [Q11：@ 標籤](../02-seedance/q11-at-tags/), [Q23](../03-diagnosis/q23-identity-drift/)；ExpCLIP → [Q15：情緒](../02-seedance/q15-emotion/) |
+| 5 去幻覺 | [CFG](https://arxiv.org/abs/2207.12598) · [RescaleCFG (WACV 2024)](https://arxiv.org/abs/2305.08891) · [DPO (NeurIPS 2023)](https://arxiv.org/abs/2305.18290) · [AV-Phys Bench](https://arxiv.org/abs/2605.07061) | §3；§3–4；§3；全文 | [Q5：CFG](../01-basics/q05-cfg/), [Q22](../03-diagnosis/q22-flicker/)；AV-Phys Bench → [Q12](../02-seedance/q12-training/), [Q24](../03-diagnosis/q24-limb-melting/), [Q27](../03-diagnosis/q27-physics-failure/) |
+| 6 前沿 | [Evolution of Video Generative Foundations](https://arxiv.org/abs/2604.06339) · [Attention Surgery](https://arxiv.org/abs/2509.24899) · [Efficient Video Diffusion Survey](https://arxiv.org/abs/2604.15911) | 全文 | Attention Surgery → [Q13：O(n²)](../02-seedance/q13-15sec-limit/)；Efficient VDM → [Q13](../02-seedance/q13-15sec-limit/)；Evolution → Part 2, 3 前瞻視角 |
+
+:::tip[🎬 導演要點]
+
+**不需要從頭讀到尾。** 按你的目的選入口：
+
+- 想理解為什麼參數這樣設 → Layer 3（DiT + Flow Matching），再讀 Layer 5（CFG + RescaleCFG）
+- 想解決具體問題 → Layer 4（操控技術），對照 [Part 3：問題診斷](../03-diagnosis/q19-lighting-face/) 找對應 Q
+- 想知道 Seedance 能做什麼、不能做什麼 → Layer 2（Model Card） + Layer 5（AV-Phys Bench 量化限制）
+- 想看領域趨勢 → Layer 1（Survey） + Layer 6（前沿）
+
+每層重點章節已標注——不需要讀全文。§3–4 通常是架構和方法，跳過 §1–2（引言/相關工作）和 §5+（實驗/附錄）可省 50% 閱讀時間。
+
+:::
+
+:::note[📖 關於 AV-Phys Bench]
+AV-Phys Bench 放在 Layer 5（去幻覺）而非 Layer 6（前沿），因為它在 [Q12](../02-seedance/q12-training/)、[Q24](../03-diagnosis/q24-limb-melting/)、[Q27](../03-diagnosis/q27-physics-failure/) 中被大量引用作為物理理解的量化基準——種子舞 2.0 總通過率 66.0%，事件轉換場景僅 53.5%。理解這個數字比知道它是最新 benchmark 更有實戰價值。
+:::

@@ -1,16 +1,105 @@
 ---
 title: ComfyUI 節點速查
-description: Seedance 2.0 相關 ComfyUI 節點組合與關鍵參數一覽
+description: Seedance 2.0 相關 ComfyUI 節點——按 DiT pipeline 介入層分類，附參數與對應 Q
 sidebar:
-  order: 1
+  order: 2
 ---
 
-| 控制維度 | 節點組合 | 關鍵參數 |
-|---|---|---|
-| 角色面部鎖定 | `IP-Adapter FaceID Plus V2` + `FaceDetailer` | weight **0.8–0.9**；FaceDetailer denoise **0.2–0.35** |
-| 肢體動作控制 | `DWPose` + `Depth Anything V2`（雙重 ControlNet） | strength **0.5–0.6**；start=**0.0**, end=**0.7**；CFG ≤ **7**；RescaleCFG **0.6** |
-| 空間深度控制 | `Depth Anything V2` + `ZoeDepth` | 複雜場景疊加 Tile ControlNet |
-| 運鏡控制 | `CameraCtrl` + `FreeInit` + `Tile ControlNet` | FreeInit 預設參數（filter_type=gaussian）；Euler sampler，Steps ≥ 25 |
-| 區域隔離（多人） | `Regional Prompting` + SAM + `Multiple IP-Adapters` | 每個 IP-Adapter 只綁定對應 SAM mask 區域；≤ 2 角色最佳 |
-| 防潰爛（基礎） | `RescaleCFG` + `FreeInit` | RescaleCFG **0.5–0.7**；CFG ≤ 7 |
-| 畫質提升 | `Ultimate SD Upscale` / `RealESRGAN` | 720p → 1080p/4K；不是原生解析度的替代方案 |
+## 一句話
+
+ComfyUI 節點在 DiT pipeline 的不同層介入——Cross-Attention 層注入身份、Residual Injection 層施加幾何約束、去噪穩定性層防止崩潰。知道一個節點在哪一層介入，才知道它解決什麼問題、跟什麼節點疊加。
+
+## 節點分類邏輯（WHY）
+
+[Q8：Pipeline 總覽](../01-basics/q08-pipeline/) 的五階段流程中，ComfyUI 節點主要在**去噪迴圈**（階段 4）介入，依介入點分為五層：
+
+1. **Cross-Attention 層**：修改 token 之間的注意力權重——IP-Adapter 在這裡注入身份 embedding
+2. **Residual Injection 層**：ControlNet 走獨立 encoder，透過 residual connection 直接對 latent 施加結構約束——不走 Cross-Attention，不經過文字引導
+3. **去噪穩定性層**：調節 CFG、重置噪聲、限制極端值——不改變注意力或 latent 結構，只穩定去噪過程
+4. **空間隔離層**：SAM 預分割畫面，每個 IP-Adapter 只綁定對應 mask——spatial localized injection
+5. **後處理 / 音訊層**：生成後升頻、音訊優先級路由
+
+## 節點速查表
+
+### Cross-Attention 層
+
+| 節點 | 參數 | 用途 | 對應 Q |
+|---|---|---|---|
+| **IP-Adapter FaceID Plus V2** | weight **0.8–0.9** | 每步去噪強制注入面部 identity embedding | [Q23](../03-diagnosis/q23-identity-drift/) |
+| **FaceDetailer** | denoise **0.2–0.35** | 去噪後段局部修復面部區域 | [Q23](../03-diagnosis/q23-identity-drift/) |
+| **Multiple IP-Adapters** | 每個角色獨立 weight，色系差異最大化 | 多角色各自獨立身份注入 | [Q28](../03-diagnosis/q28-feature-bleeding/) |
+
+### Residual Injection 層（ControlNet 系）
+
+ControlNet 走獨立 encoder + residual injection，不走 Cross-Attention 文字引導——這是直接對 latent 施加結構約束。
+
+| 節點 | 參數 | 用途 | 對應 Q |
+|---|---|---|---|
+| **DWPose Full Body** | strength **0.5–0.6**, start=**0.0**, end=**0.7** | 骨骼/姿態結構約束（前段介入，後段放手） | [Q24](../03-diagnosis/q24-limb-melting/) |
+| **Depth Anything V2** | 同上，與 DWPose 疊加雙 ControlNet | 深度空間約束，防止肢體融化 | [Q24](../03-diagnosis/q24-limb-melting/), [Q27](../03-diagnosis/q27-physics-failure/) |
+| **ZoeDepth** | 疊加 Tile ControlNet，用於複雜場景 | 深度估計輔助 | [Q27](../03-diagnosis/q27-physics-failure/) |
+| **Tile ControlNet** | 與 CameraCtrl + FreeInit 疊加 | 鎖定局部空間結構，防止運鏡時背景漂移 | [Q30](../03-diagnosis/q30-background-drift/) |
+| **CameraCtrl** | 搭配 FreeInit（預設）+ Euler sampler, Steps ≥ 25 | 提供 explicit camera path 約束 | [Q14](../02-seedance/q14-camera-motion/), [Q30](../03-diagnosis/q30-background-drift/) |
+
+### 去噪穩定性層
+
+| 節點 | 參數 | 用途 | 對應 Q |
+|---|---|---|---|
+| **RescaleCFG** | **0.5–0.7** | 去噪後段自動降 CFG，防止 SNR 崩潰（肢體/色彩域） | [Q5](../01-basics/q05-cfg/), [Q22](../03-diagnosis/q22-flicker/), [Q24](../03-diagnosis/q24-limb-melting/) |
+| **FreeInit** | filter_type=**gaussian**（預設參數） | 重設初期噪聲，強化 Temporal Attention 跨幀一致性，抑制閃爍/抖動/漂移 | [Q22](../03-diagnosis/q22-flicker/), [Q29](../03-diagnosis/q29-fast-motion/), [Q30](../03-diagnosis/q30-background-drift/) |
+| **Dynamic Thresholding** | 每步限制去噪極端值 | ComfyUI 額外防線，防止色彩過飽和與亮度突變 | [Q22](../03-diagnosis/q22-flicker/) |
+
+### 空間隔離層
+
+| 節點 | 參數 | 用途 | 對應 Q |
+|---|---|---|---|
+| **Regional Prompting + SAM** | SAM 預分割畫面，每個 IP-Adapter 只綁定對應 mask 區域 | 多角色 spatial localized injection，不走 Cross-Attention 全域查閱 | [Q28](../03-diagnosis/q28-feature-bleeding/) |
+
+### 音訊層
+
+| 節點 | 參數 | 用途 | 對應 Q |
+|---|---|---|---|
+| **AudioScheduler** | `audio_priority = "upload"` | 優先使用上傳音訊而非參考影片內嵌音軌 | [Q20](../03-diagnosis/q20-audio-contamination/) |
+
+### 後處理層
+
+| 節點 | 參數 | 用途 | 對應 Q |
+|---|---|---|---|
+| **Ultimate SD Upscale / RealESRGAN** | 720p → 1080p/4K | 升頻（非原生解析度的替代方案，不修復生成階段的缺陷） | — |
+
+## 參數選取邏輯（HOW）
+
+節點疊加順序 = 介入層從底層到表層：
+
+1. **先穩住去噪**：CFG ≤ 7 + RescaleCFG 0.5–0.7 + FreeInit + Euler + Steps ≥ 25——這是所有場景的底線
+2. **再加幾何約束**（需要時）：DWPose + Depth 雙 ControlNet——問題在肢體/物理時疊加
+3. **再鎖身份**（需要時）：IP-Adapter FaceID + FaceDetailer——問題在角色一致性時疊加
+4. **最後隔離空間**（多角色時）：SAM + Regional Prompting
+
+每多一層，生成時間增加 20–50%。對白近景只要 1 + 3，打鬥場景要 1 + 2。不要全疊。
+
+:::tip[🎬 導演要點]
+
+**ControlNet 的 end 參數是關鍵。** end=0.7 表示在去噪 70% 進度後放手——前段框架建好，後段讓模型補紋理。end > 0.8：鎖太死，畫面僵硬、缺乏自然變化。end < 0.5：約束不夠，肢體還是會崩。
+
+**IP-Adapter weight > 0.9 有副作用。** 權重太高 → 臉鎖死了但表情僵掉、無法隨 prompt 情緒變化。0.8–0.9 是甜蜜點——身份一致 + 表情自由。
+
+**FreeInit 幾乎無成本。** filter_type=gaussian 是預設參數，不需要調。FreeInit 不增加生成時間（只改初始化噪聲），所有場景都建議開。
+
+節點組合見 [場景 Preset](./scene-presets/)——按場景給最小有效節點集。
+
+:::
+
+:::note[📖 引用論文]
+
+[ControlNet (Zhang et al., ICCV 2023, §3.1)](https://arxiv.org/abs/2302.05543) — 獨立 encoder + residual injection。
+
+[IP-Adapter (Ye et al., 2023, §3.2, §4)](https://arxiv.org/abs/2308.06721) — 解耦 cross-attention 身份注入。
+
+[RescaleCFG (Lin et al., WACV 2024, §3–4)](https://arxiv.org/abs/2305.08891) — 去噪後段安全閥。
+
+[FreeInit (Wu et al., 2024)](https://arxiv.org/abs/2312.07537) — 噪聲重初始化強化 temporal consistency。
+
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 雙分支 DiT 架構。
+
+:::
