@@ -1,75 +1,64 @@
 ---
-title: 為什麼寫「不要」反而生出更多？——Seedance 2.0 負面提示無效之謎
-description: 文字編碼器聽不懂否定詞、CFG 沒有負面提示通道、Joint Self-Attention 沒有「排除」語法——三層架構限制解釋為什麼負面提示在 Seedance 2.0 完全無效
+title: 為什麼寫「不要」反而生出更多？——Seedance 2.0 沒有負面提示
+description: 文字編碼器聽不懂否定詞、CFG 沒有負面提示通道、Self-Attention 沒有排除語法——三層架構限制解釋為什麼否定句完全無效
 sidebar:
   order: 11
 ---
 
 ## 一句話
 
-Seedance 2.0 沒有負面提示，把否定句寫進 prompt 只會讓模型更專注於你不想看到的東西——因為文字編碼器聽不懂「不」字，CFG 架構也沒有第二條通道處理排除指令。
+Seedance 2.0 沒有負面提示——文字編碼器聽不懂「不」、CFG 沒有負面通道、Attention 沒有排除語法，否定句不只無效，還會反效果。
 
-## 為什麼其他模型可以寫負面提示，Seedance 不行？
+## 為什麼其他模型可以，Seedance 不行？
 
-先回顧 [Q5：CFG](../01-basics/q05-cfg/) 機制。每一步去噪，模型跑兩次預測：一次有 prompt，一次沒有。CFG 在兩者之間線性外推——CFG 越高，輸出越偏離「自由發揮」，越靠近「嚴格遵從 prompt」。
+[Q5：CFG](../01-basics/q05-cfg/) 的機制：每一步去噪模型跑兩次預測，一次有 prompt、一次沒有，CFG 在兩者之間線性外推。Stable Diffusion 和 Midjourney 的負面提示就是把「無 prompt」那端換成「負面 prompt」——外推方向變成偏離負面、靠近正面。**這需要架構上有兩個獨立的文字輸入點。**
 
-Stable Diffusion 和 Midjourney 的負面提示，是把這個機制再推一步：CFG 公式中的「無 prompt 預測」，換成「負面 prompt 預測」。外推方向從「偏離空白→靠近正面」，變成「偏離負面→靠近正面」。這需要兩個文字輸入點——一個接正面 prompt，一個接負面 prompt。
-
-Seedance 2.0 沒有第二個輸入點。它的 CFG 只有「有 prompt」和「無 prompt（空）」兩種模式。[Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) 的 Joint Self-Attention 把文字、圖片、影片、音訊全部塞進同一個注意力空間——沒有預留一條獨立的負面提示通道。這不是功能缺漏，是 MM-DiT 架構的設計取捨——選擇了模態間的深度融合，代價是無法像傳統 UNet 架構那樣簡單插入第二組文字條件。
+Seedance 2.0 沒有第二個輸入點。[Q9：多模態融合](../02-seedance/q09-multimodal-fusion/) 的 Joint Self-Attention 把文字、圖片、影片全塞進同一個注意力空間——沒有預留獨立的負面提示通道。CFG 只有兩種模式：有 prompt 和完全空白。這不是功能缺漏，是 MM-DiT 架構的設計取捨——選了模態間深度融合，代價是無法簡單插入第二組文字條件。
 
 ## 那在 prompt 裡寫「不要」總可以吧？
 
-不行。而且有三層原因。
+不行。而且有三層原因，從文字編碼一路到 Attention 全卡住。
 
-第一層：文字編碼器聽不懂否定。 CVPR 2025 的研究（Alhamoud et al.）系統性證明了這件事——CLIP 等視覺語言模型對否定詞近乎失明。測試中，「a scientist not wearing glasses」和「a scientist wearing glasses」的語意向量幾乎完全重疊。否定詞在 embedding space 中只是一個極微弱的偏移，完全被內容詞（scientist、glasses）壓過去。你寫「不要多手多腳」——模型讀到的關鍵詞是「多手多腳」，然後在 Cross-Attention 中把這些詞對應到視覺特徵。否定詞沒有改變任何事情。
+### 第一層：文字編碼器聽不懂否定
 
-第二層：CFG 的外推方向正好相反。 Seedance 2.0 的 CFG 無條件分支用的是空 text embedding（一個固定的空白向量，不是「不要多手多腳」的 embedding）。你寫的否定詞只在有條件分支中起作用——模型在「有 prompt」那輪看到「多手多腳」，在「無 prompt」那輪完全看不到任何東西。CFG 的外推方向是遠離空白、靠近「多手多腳」——你等於在**幫模型放大**你不想看到的東西。
+CLIP 等文字編碼器對否定詞近乎失明（Alhamoud et al., CVPR 2025）。測試中「a scientist not wearing glasses」和「a scientist wearing glasses」的語意向量幾乎完全重疊。否定詞在 embedding space 中只是一個極微弱的偏移，被內容詞（scientist、glasses）完全壓過去。你寫「不要多手多腳」——模型讀到的關鍵詞是「多手多腳」，否定詞沒有改變任何事。
 
-第三層：DiT 的 Self-Attention 沒有「排除」語法。 [Q3：Patchify/DiT](../01-basics/q03-patchify-dit/) 講過，DiT 用 Self-Attention 讓每個 token 看到所有其他 token——這是全局視野的優點。但代價是：所有 token 都是平等的，沒有架構層級的機制來標記「這裡有否定運算子，後面的內容詞應該被反向加權」。[Q4：注意力機制](../01-basics/q04-attention/) 講的 Query/Key/Value 在 Joint Self-Attention 中共用同一個權重矩陣——沒有地方讓你說「這條路線是減法」。
+### 第二層：CFG 外推方向正好相反
 
-## 社群實測吻合
+CFG 的無條件分支用的是空白向量——不是「不要多手多腳」的 embedding。模型在「有 prompt」那輪讀到「多手多腳」，在「無 prompt」那輪什麼都沒看到。外推方向是遠離空白、靠近「多手多腳」——**你等於在幫模型放大你不想看到的東西。**
 
-Reddit r/seedance2pro 實測結論：「negative prompt seems to be entirely ignored」。r/aivideos 指南直接寫：「Seedance doesn't do negative prompts」。r/generativeAI 的完整手冊總結：「it doesn't recognize negative prompts — you have to tell it exactly what you want using positive constraints」。
+### 第三層：Self-Attention 沒有排除語法
 
-seedance.tv 官方 prompt guide 中使用的所謂「negative constraints」——"no extra text, no logo distortion, stable product shape"——其實不是負面提示。它們是 guardrail 措辭：模型在訓練中見過大量包含這類約束短語的影片描述，學會了把「no extra text」關聯到「乾淨畫面」的視覺分佈。這跟 CFG 負面提示是兩回事——效果來自訓練數據中的語意關聯，不是來自去噪過程中的 CFG 反向推力。而且社群實測確認，這類 guardrail 只在簡單的排除性約束上勉強有效（不亂加字、不變形），對複雜的否定描述（不要特定動作、不要特定物體）完全沒用。
+[Q4：注意力機制](../01-basics/q04-attention/) 的 Query/Key/Value 共用同一個權重矩陣——所有 token 平等對待。架構上沒有地方可以標記「這是排除符號，後面的內容詞要反向加權」。Attention 只知道 token 之間要互相對看，不知道什麼叫「不要」。
 
 ## 沒有負面提示，怎麼約束？
 
-解法很直接：全部正著說。
+全部正著說。三個方法。
 
-**正向改寫。** 「不要晃」→「static shot, locked-off camera」。「不要多手多腳」→「two arms, two legs, anatomically correct proportions」。核心原則：描述你要什麼，不要描述你不要什麼。
+正向改寫。「不要晃」→「static shot, locked-off camera」。「不要多手多腳」→「two arms, two legs, anatomically correct proportions」。「畫面不要有雜物」→「clean, minimal background」。原則只有一條：描述你要的畫面，不要描述你不要的。
 
-**用 @ 標籤鎖定視覺。** 不要寫「不要變臉」——上傳參考圖到 `@image1`。不要寫「不要亂動」——上傳動作參考到 `@video1`。[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 embedding slot 直接繞過文字編碼器，把視覺特徵灌進 Cross-Attention——比用文字描述「不要什麼」強一百倍。
+用 @ 標籤鎖定視覺。文字編碼器聽不懂否定，但 [Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 embedding slot 繞過文字編碼器，直接把視覺特徵灌進 Cross-Attention。不要寫「不要變臉」——上傳參考圖到 `@image1`。不要寫「不要亂動」——上傳動作參考到 `@video1`。
 
-**把約束包裝成畫面屬性。** 「畫面不要有雜物」→「clean, minimal background, only the subject visible」。「光影不要亂跳」→「consistent soft studio lighting, no flicker」。注意：這裡的"no"不是否定語法——"no flicker"是視覺類別標籤，模型在訓練中見過這個標籤對應的畫面長怎樣。關鍵字眼是它描述了一個正向的視覺狀態，不是描述一個要排除的對象。
-
-ComfyUI 中的 IP-Adapter、ControlNet、FaceDetailer 等節點都施加正向結構約束（鎖骨骼、鎖深度、鎖身份），不提供負面提示功能。ComfyUI 社群對 Wan 等 DiT 模型的實驗性方案 VSF（Value Sign Flip, arXiv:2508.10931）可透過翻轉注意力值符號來模擬負面引導——但需模型本身支援獨立負面 prompt 輸入，目前未在 Seedance 2.0 上驗證。完整節點見 [Part 4：ComfyUI 節點速查](../04-workflow/comfyui-nodes/)。
+把約束包裝成畫面屬性。注意某些 prompt 範例中的 "no extra text, no logo distortion"——這些不是 CFG 負面提示，是正向視覺類別標籤。模型在訓練中見過這些片語對應的畫面（乾淨、無文字），效果來自語意關聯而非反向推力。對簡單約束勉強有效，複雜否定（不要特定動作、不要特定物體）完全沒用。
 
 :::tip[🎬 導演要點]
 
-Seedance 2.0 的 prompt 不是指令系統，是內容描述系統。你寫的每個字都在告訴模型「畫面裡有什麼」——包括你不想看到的東西。
+Seedance 2.0 的 prompt 是內容描述系統，不是指令系統。你寫的每個字都在告訴模型「畫面裡有什麼」——包括你不想看到的東西。
 
-**永遠正著寫。** 把每個「不要」改寫成「要什麼」的正面描述。這不是 prompt 工程技巧，是 Seedance 2.0 架構決定的唯一可行路徑。
-
-靠 @ 標籤做視覺約束，靠 prompt 做正向描述，不要試圖讓模型讀懂否定句——它真的讀不懂。
+永遠正著寫。把每個「不要」改寫成「要什麼」。這不是 prompt 技巧，是架構決定的唯一可行路徑。靠 @ 標籤做視覺約束，靠 prompt 做正向描述——不要試圖讓模型讀懂否定句，它真的讀不懂。
 
 :::
 
 :::note[📖 引用論文]
-[Vision-Language Models Do Not Understand Negation (Alhamoud et al., CVPR 2025)](https://arxiv.org/abs/2501.09425) — CLIP 等 VLM 對否定詞近乎失明，否定句 embedding 和肯定句幾乎相同。
+[Vision-Language Models Do Not Understand Negation (Alhamoud et al., CVPR 2025)](https://arxiv.org/abs/2501.09425) — CLIP 等 VLM 對否定詞近乎失明。
 
-[Dynamic Negative Guidance of Diffusion Models (Koulischer et al., ICLR 2025)](https://arxiv.org/abs/2410.14398) — 固定 guidance scale 的 NP 在反向非穩態過程中可能完全失敗。
-
-[Condition-Degradation Guidance (Han et al., CVPR 2026)](https://arxiv.org/abs/2603.10780) — CFG 的空 prompt（∅）導致 guidance signal 幾何糾纏，限制精細語意控制。
-
-[Diffusion Models with Adaptive Negative Sampling (Desai & Vasconcelos, 2025)](https://arxiv.org/abs/2508.02973) — 負面 prompt 天生有損且不完整，模型內部否定理解更可靠。
-
-[VSF: Value Sign Flip (Guo & Du, 2025)](https://arxiv.org/abs/2508.10931) — 少步模型中翻轉注意力值符號模擬負面引導，需獨立負面 prompt 輸入端。
+[Dynamic Negative Guidance of Diffusion Models (Koulischer et al., ICLR 2025)](https://arxiv.org/abs/2410.14398) — 固定 guidance scale 的 NP 可能完全失敗。
 
 [CFG (Ho & Salimans, 2022, §3)](https://arxiv.org/abs/2207.12598) — 標準 CFG 公式。
 
+[Seedance 2.0 Model Card](https://arxiv.org/abs/2604.14148) — 多模態 DiT 架構。
 :::
 
 :::caution[⚠️ 誠實揭露]
-本 Q 關於 Seedance 2.0 CFG 僅支援空 prompt（無負面 prompt 端點）的結論，是基於三點交叉推論：(1) 產品介面無負面提示欄位、(2) 社群大量實測確認否定句無效甚至反效果、(3) DiT/MM-DiT 架構的已知限制（Joint Self-Attention 無獨立條件通道）。Seedance 2.0 Model Card 未揭露 CFG 或 negative prompting 實作細節，以上推論以官方技術論文為準。
+Seedance 2.0 CFG 僅支援空 prompt（無負面 prompt 端點）的結論，基於三點交叉推論：(1) 產品介面無負面提示欄位、(2) 社群大量實測確認否定句無效甚至反效果、(3) DiT/MM-DiT 架構的已知限制。Seedance 2.0 Model Card 未揭露 CFG 或 negative prompting 實作細節。
 :::
