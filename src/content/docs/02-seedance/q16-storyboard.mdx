@@ -1,85 +1,43 @@
 ---
 title: 丟九宮格 storyboard 給 Seedance——它真的看得懂嗎？
-description: 從社群使用行為反推三種可能的內部機制，以文字滲入 bug 和 prompt 依賴性為關鍵證據，判斷最可能的做法
+description: 從社群行為反推 storyboard 的內部機制：vision encoder 整張編碼 + emergent OCR + prompt 敘事引導
 sidebar:
   order: 8
 ---
 
 ## 一句話
 
-Seedance 論文沒有描述 storyboard 的內部機制。從社群行為反推：storyboard 走的是標準 vision encoder（整張圖編碼，無 panel 分割、無獨立 OCR），model 透過預訓練先驗理解 grid 結構，文字標註被 encoder 的 emergent OCR 能力部分讀取——但文字同時被當成 visual texture，所以可能滲入輸出。
+Storyboard 走的是標準 vision encoder，整張圖編碼，沒有 panel 分割、沒有獨立 OCR。grid 結構靠 vision encoder 的空間理解能力隱式處理，文字標註靠 emergent OCR 部分讀取——但文字同時被當成 visual texture，所以可能滲入輸出。model 需要 prompt 提供 panel 之間的敘事邏輯，因為 vision encoder 不負責理解「panel 1 和 panel 2 是什麼關係」。
 
-## 已知行為
+## 為什麼不是更複雜的做法
 
-要反推機制，手上有五個可重現的社群觀察：
+兩個關鍵現象排除了其他可能：
 
-1. **Storyboard 比單張 mood board 更能控制 shot 結構和運鏡**（nemovideo.com、oimi.ai 案例：12 格註釋 storyboard 一次生成成功）
-2. **Panel 數 ≤4 格效果最好，越多越容易亂**（morphic.com："With too many references, the model struggles to judge which features take priority"）
-3. **文字標註會滲入輸出畫面**（OpenArt Handbook：需手動加 "no text overlay on screen" 來防止）
-4. **Prompt 必須描述 panel 之間的敘事邏輯，model 不會自動理解**（OpenArt Handbook："describe the narrative logic between panels in your prompt"）
-5. **ComfyUI 直接餵整張 contact sheet，不切片**（`ByteDance2ReferenceNode`）
+**文字滲入 bug**（OpenArt Handbook：storyboard 上的 "CU"、"push-in" 可能 bleed 進影片畫面）。這表示文字沒有被提取成獨立的 text token——如果內部有 OCR pipeline 把文字分離出來，文字就不會留在畫面中。同一段文字同時被當成語義指引和 visual texture，這是 emergent OCR（vision encoder 在訓練中獲得的識字能力，不是獨立模組）的特徵。
 
-## 三種可能的機制
+**ComfyUI 直接餵整張 contact sheet 就能 work**。如果內部需要切片，這不可能。
 
-### A：整張圖當成單一 visual condition
+## 機制：三步
 
-Storyboard 和 mood board 走同一條路——vision encoder 把整張圖編碼成 visual tokens，注入 cross-attention。沒有 panel 分割、沒有文字提取。
+**Step 1：整張圖編碼，保留空間結構。** Vision encoder（SigLIP/CLIP 等級）把 storyboard 整張編碼成 visual tokens。Feature map 保留原圖的空間佈局——左上方的 patch token 帶著 panel 1 的視覺特徵，右下方的 token 帶著 panel 3 的特徵。grid 的排列規律被 encoder 理解為空間結構，不需要獨立的 panel detection。
 
-Panel 之間的空間變化（左上 wide shot、右上 close-up）被保留在 feature map 中，model 靠預訓練先驗學到「空間結構變化的條件 → 時間上有 shot 變化」。運鏡由 Temporal Attention 和 [Q14：預訓練視覺先驗](../q14-camera-motion/) 補出。
+**Step 2：Prompt 提供敘事邏輯。** Vision encoder 只提供空間結構，不提供「panel 1→panel 2→panel 3 之間是什麼關係」。這個關係來自 prompt。OpenArt Handbook 要求使用者 "describe the narrative logic between panels in your prompt"——model 不會自己推斷為什麼 wide shot 後面接 close-up。
 
-| 觀察 | 吻合？ |
-|------|--------|
-| Panel 越多越差 | 是——每格空間越小，特徵越模糊 |
-| 文字滲入 | 是——文字 = visual texture，沒被提取 |
-| Prompt 描述敘事邏輯是必須的 | 部分——model 靠預訓練先驗推斷 shot 過渡，但沒有 prompt 引導會偏離意圖 |
-| 文字能被讀取 | **否——沒有 OCR 能力** |
-
-### B：Vision encoder + Prompt 引導 + emergent OCR
-
-在 A 的基礎上多加兩層：(1) prompt 文字引導 cross-attention 在不同時間段關注 feature map 的不同空間區域；(2) vision encoder（SigLIP/CLIP 等級）在大量 image-text pair 訓練中獲得 emergent OCR——能識別圖片中的文字為語義資訊，但文字同時保留為 visual token，沒有被分離。
-
-**關鍵證據**：OpenArt Handbook 說必須在 prompt 中描述 panel 之間的敘事邏輯。這表示 model 需要 prompt 來理解「panel 1 和 panel 2 之間是什麼關係」——vision encoder 提供空間結構，但**敘事理解來自 prompt，不是來自 VLM**。
-
-oimi.ai 的 12 格案例中，storyboard 上的運鏡註釋（"camera follows wagon"、"camera glides into tavern"）確實影響了輸出——但如果 model 沒有讀取這些文字的能力，效果應該和沒有註釋的 storyboard 一樣。文字滲入 bug 反過來證明了同一件事：文字被讀取了（作為語義），也被保留了（作為 visual texture），兩者沒有分離。
-
-| 觀察 | 吻合？ |
-|------|--------|
-| Panel 越多越差 | 是——空間 attention 稀釋 |
-| 文字滲入 | 是——文字同時是語義和 texture，未被分離 |
-| Prompt 描述敘事邏輯是必須的 | 是——vision encoder 提供結構，prompt 提供敘事 |
-| 文字能被讀取 | 是——emergent OCR，非獨立 pipeline |
-
-### C：前處理切片 + 獨立 panel 注入
-
-系統（或使用者）先切片 → 每個 panel 作為獨立 reference image 編碼和注入，類似 @image1、@image2 的多圖機制。
-
-**被兩個觀察直接否定**：(1) ComfyUI 餵整張 contact sheet 就能 work——如果切片是必要路徑，這不可能；(2) 文字滲入 bug——如果 panel 獨立編碼，文字只會是條件，不會出現在畫面中。
-
-Seedance 支援最多 9 張 reference，容量上和九宮格對應——但這只能證明 C 是可行的**替代方案**（使用者自己切好上傳九張圖），不是內部預設行為。
-
-## 證據指向
-
-**做法 B 最符合所有觀察**，但需要一個修正：
-
-我之前把 B 描述為「prompt 引導 spatial attention 在不同 timestep 關注不同區域」——這層細節（spatial attention 分配機制）是推論，沒有直接證據。社群證據實際上支持的是更保守的版本：**vision encoder 提供含空間結構的 visual feature，emergent OCR 讀取文字標註，prompt 提供敘事邏輯來串接 panel 之間的關係**。model 如何把這三者整合——是在 attention 層、還是 embedding 層、還是 denoising schedule 層——論文沒寫，社群也沒有揭露。
+**Step 3：Cross-Attention 結合視覺條件和文字引導。** Visual token 帶著空間位置資訊進入 DiT 的 cross-attention。Prompt 中的敘事描述（"panel 1 wide shot → panel 2 close-up"）引導 attention 在不同時間段關注不同的空間區域。Temporal Attention（[Q4](../q04-spatial-temporal/)）平滑過渡，預訓練先驗（[Q14](../q14-camera-motion/)）補出運鏡。
 
 :::tip[🎬 導演要點]
-- **≤4 panel（2×2）是甜蜜點**——格數越多每格越模糊，attention 越稀釋
-- **文字標註是雙面刃**——會被讀取但可能滲入畫面。運鏡術語寫在 prompt 中比寫在 storyboard 上更安全
-- **Prompt 必須描述敘事邏輯**——只寫 "Use reference image to generate video" 不夠，要說明 panel 之間的關係和節奏
-- 實戰技巧見 [Q17：Storyboard 實戰](../q17-storyboard-practice/)
+- **≤4 panel 最穩**——格數越多每格空間越小，attention 越難區分
+- **角色參考圖和 storyboard 分開上傳**——同一角色在不同 panel 畫得稍有不同，model 會當成不同的人
+- **文字標註寫在 prompt 裡，不要寫在 storyboard 上**——寫在圖上的文字既是語義也是 texture
+- 完整實戰流程見 [Q17：Storyboard 實戰](../q17-storyboard-practice/)
 :::
 
 :::caution[⚠️ 誠實揭露]
-Seedance 1.0/2.0 論文均未描述 storyboard 內部機制。做法 A/B/C 為從社群行為反推的假設。做法 B 中 vision encoder 的 emergent OCR 基於 SigLIP/CLIP 的已知能力類推，prompt 引導機制基於 DiT cross-attention 標準行為推論——均未經 Seedance 論文或官方文件確認。
+Seedance 論文未描述 storyboard 內部機制。以上機制為從社群使用行為（文字滲入 bug、prompt 依賴性、ComfyUI workflow）反推的推論，非官方確認。
 :::
 
 :::note[📖 引用論文]
 Seedance 2.0: Advancing Video Generation for World Complexity — [arxiv:2604.14148](https://arxiv.org/abs/2604.14148)
 
 Seedance 1.0: Exploring the Boundaries of Video Generation Models — [arxiv:2506.09113](https://arxiv.org/abs/2506.09113)
-
-VINO: A Unified Visual Generator with Interleaved OmniModal Context — [arxiv:2601.02358](https://arxiv.org/abs/2601.02358)
-
-Kaleido: Multi-Subject Reference Video Generation with R-RoPE — [arxiv:2510.18573](https://arxiv.org/abs/2510.18573)
 :::
