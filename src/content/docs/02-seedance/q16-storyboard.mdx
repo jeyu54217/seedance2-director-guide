@@ -1,35 +1,43 @@
 ---
 title: 丟九宮格 storyboard 給 Seedance——它真的看得懂嗎？
-description: 從社群行為反推 storyboard 內部機制：vision encoder 整張編碼 + 文字被讀取（機制未知）+ prompt 敘事引導
+description: Vision encoder 整張編碼、文字可能被讀取也可能滲入、prompt 負責串接 panel 之間的敘事邏輯
 sidebar:
   order: 8
 ---
 
 ## 一句話
 
-Storyboard 走 vision encoder 整張圖編碼，沒有 panel 分割。grid 結構靠 encoder 的空間理解隱式處理。**文字標註會被讀取**（oimi.ai 案例中 storyboard 上的運鏡註釋確實影響了輸出），但文字同時留在 visual feature 中沒有被移除——所以可能滲入畫面。讀取文字的機制未知：可能是 vision encoder 內建的 OCR 能力，也可能是 ByteDance 的 Seed-VL 家族做前處理——兩種都無法被現有證據排除。model 需要 prompt 提供 panel 之間的敘事邏輯：vision encoder 告訴 model「這張圖長怎樣」，prompt 告訴 model「這些 panel 之間的關係是什麼」。
+Seedance 把整張 storyboard 當成一張圖編碼，靠 prompt 理解 panel 之間的敘事關係；文字標註會被讀取，但同時留在視覺特徵中，可能滲入輸出畫面。
 
-## 為什麼不是前處理切片
+## 一張圖為什麼能產生多個鏡頭
 
-ComfyUI 的 `ByteDance2ReferenceNode` 直接餵整張 contact sheet，沒有切片步驟。如果內部需要先把 storyboard 切成獨立 panel，這個 workflow 不應該 work。切片可能是可行的替代方案（使用者自己切好九張圖上傳），但不是內部預設行為。
+單張 mood board 只有一組顏色、光影、構圖——model 在每一幀看到的是同一個條件。但 storyboard 的 grid 佈局本身就帶有空間變化：panel 1 是 wide shot，panel 2 是 close-up，panel 3 是低角度。Vision encoder 輸出的 feature map 保留了這個空間結構——不同 spatial position 帶著不同 panel 的視覺特徵。
 
-## 機制：三步
+Model 在訓練中學到一件事：條件訊號在空間上有結構性變化 → 時間上應該產生 shot 變化。Storyboard 和 mood board 走同一條編碼路徑，差別在於 storyboard 的 feature map 自帶空間差異，mood board 沒有。
 
-**Step 1：整張圖編碼，保留空間結構。** Vision encoder（SigLIP/CLIP 等級）把 storyboard 整張編碼成 visual tokens。Feature map 保留原圖的空間佈局——左上方的 patch token 帶著 panel 1 的視覺特徵，右下方的 token 帶著 panel 3 的特徵。grid 的排列規律被 encoder 理解為空間結構，不需要獨立的 panel detection。
+## 模型實際看到的是什麼
 
-**Step 2：Prompt 提供敘事邏輯。** Vision encoder 只提供空間結構，不提供「panel 1→panel 2→panel 3 之間是什麼關係」。這個關係來自 prompt。OpenArt Handbook 要求使用者 "describe the narrative logic between panels in your prompt"——model 不會自己推斷為什麼 wide shot 後面接 close-up。
+整張圖，沒有 panel 分割。Vision encoder 的 feature map 中，左上方 token 對應 panel 1 的構圖，右上方對應 panel 2，依此類推。grid 的排列規律被 encoder 理解為空間結構——和它理解「照片裡有兩個人」是同一種能力。
 
-**Step 3：Cross-Attention 結合視覺條件和文字引導。** Visual token 帶著空間位置資訊進入 DiT 的 cross-attention。Prompt 中的敘事描述（"panel 1 wide shot → panel 2 close-up"）引導 attention 在不同時間段關注不同的空間區域。Temporal Attention（[Q4](../q04-spatial-temporal/)）平滑過渡，預訓練先驗（[Q14](../q14-camera-motion/)）補出運鏡。
+Panel 上的文字標註（"CU"、"push-in"、"0-3s"）**會被讀取**——oimi.ai 的案例中，storyboard 上的運鏡註釋確實影響了輸出。但讀取的機制未知：可能是 vision encoder 內建的識字能力，也可能是 ByteDance 的 Seed-VL 家族做前處理。無論哪種，文字同時留在 visual feature 中沒有被移除——這是文字滲入 bug 的根源（OpenArt Handbook：需手動加 "no text overlay on screen"）。
+
+## 鏡頭序列是怎麼生成的
+
+Vision encoder 負責「這張圖長怎樣」——空間結構、panel 內容、文字。但它不負責「panel 1 和 panel 2 之間是什麼關係」。這個關係來自 prompt。OpenArt Handbook 明確要求使用者 "describe the narrative logic between panels in your prompt"——model 不會自己推斷為什麼 wide shot 後面接 close-up。
+
+Prompt 中的敘事描述引導 cross-attention 在不同時間段關注 feature map 的不同空間區域：[Q4：Temporal Attention](../q04-spatial-temporal/) 在時間軸上平滑這些 attention focus 之間的過渡，[Q14：預訓練視覺先驗](../q14-camera-motion/) 補出具體的運鏡方式。
+
+這個機制的副產品是：panel 越多，每格在 feature map 中佔的空間越小，attention 越難區分不同 panel。這就是為什麼社群共識是 **≤4 格（2×2）效果最好**。
 
 :::tip[🎬 導演要點]
-- **≤4 panel 最穩**——格數越多每格空間越小，attention 越難區分
-- **角色參考圖和 storyboard 分開上傳**——同一角色在不同 panel 畫得稍有不同，model 會當成不同的人
-- **文字標註寫在 prompt 裡，不要寫在 storyboard 上**——寫在圖上的文字既是語義也是 texture
+- **≤4 panel 最穩**——格數越多 attention 越稀釋
+- **角色參考圖和 storyboard 分開上傳**——同一角色在不同 panel 畫得稍有不同，model 可能當成不同的人
+- **文字標註寫在 prompt 裡，不要寫在 storyboard 上**
 - 完整實戰流程見 [Q17：Storyboard 實戰](../q17-storyboard-practice/)
 :::
 
 :::caution[⚠️ 誠實揭露]
-Seedance 論文未描述 storyboard 內部機制。以上為從社群行為反推的推論。文字讀取的具體機制（vision encoder 內建 OCR vs 專用 VLM/OCR 前處理）無法從現有證據判斷；文字滲入 bug 只證明文字未被從視覺特徵中移除，不構成對 OCR 存在的否定。
+Seedance 論文未描述 storyboard 內部機制。以上為從社群行為反推的推論，非官方確認。文字讀取的具體機制（vision encoder 內建 vs 專用 VLM/OCR）無法從現有證據判斷。
 :::
 
 :::note[📖 引用論文]

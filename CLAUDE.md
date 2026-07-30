@@ -1,6 +1,6 @@
 # Seedance2 Director Guide
 
-Static site. Custom build.mjs converts MDX→single-page HTML. 33 Q&A pages, 4 sections, zh-TW.
+Static site. Custom build.mjs converts MDX→single-page HTML. 35 Q&A pages, 4 sections, zh-TW.
 
 ## Commands
 | 用途 | 命令 |
@@ -11,7 +11,7 @@ Static site. Custom build.mjs converts MDX→single-page HTML. 33 Q&A pages, 4 s
 ## 架構
 - `src/content/docs/01-basics/` — Part 1: 擴散模型基礎 (Q1-Q8)
 - `src/content/docs/02-seedance/` — Part 2: Seedance 2.0 特性 (Q9-Q18)
-- `src/content/docs/03-diagnosis/` — Part 3: 問題診斷 (Q19-Q29)
+- `src/content/docs/03-diagnosis/` — Part 3: 問題診斷 (Q19-Q30)
 - `src/content/docs/04-workflow/` — Part 4: 實戰工作流
 - `build.mjs` — 讀 MDX → 解析 frontmatter → 渲染 markdown → 注入 HTML 模板
 - `dist/` — 輸出 (index.html + static assets)
@@ -21,11 +21,16 @@ Static site. Custom build.mjs converts MDX→single-page HTML. 33 Q&A pages, 4 s
 ### 問題意識
 帶著「問題意識」寫——每一段回答一個自然浮現的追問。讀者看完上一段，心裡應該浮現一個問題，而下一段的第一句就回答它。不要堆砌名詞解釋，要先給讀者一個「為什麼需要知道這個」的動機。
 
-### 段落結構：WHY → WHAT → HOW → 導演應用
-1. **WHY**：先建立動機——為什麼需要這個？不用它會怎樣？
-2. **WHAT**：給出核心概念，一句話講完，再用段落展開
-3. **HOW**：機制細節（架構、流程、參數）
+### 段落結構：動機 → 機制 → 解法 → 導演應用
+
+每題自然形成四個層次，對應四種標題類型：
+
+1. **動機（對應 WHY）**：先建立動機——為什麼需要這個？不用它會怎樣？標題寫成問題句或現象描述。例：`## 為什麼光一暗臉就變？`、`## 高 CFG 怎麼把肢體砍掉的？`
+2. **機制（對應 WHAT）**：核心概念或量化證據，一句話講完再用段落展開。標題寫成名詞短語。例：`## 兩個觸發條件`、`## AV-Phys Bench 的量化證據`
+3. **解法（對應 HOW）**：機制細節與實務做法（架構、流程、參數）。標題寫成動作導向。例：`## 解法：ComfyUI 與 Seedance 對照`、`## 分級策略：依場景複雜度選擇約束強度`、`## 暗場景下的 Attention 退化機制`
 4. **導演應用**：對導演/使用者來說這意味著什麼（`:::tip[🎬 導演要點]`）
+
+**嚴禁直接打出 WHY/WHAT/HOW 三個字作為標題。** 每個標題必須從內容中提煉，讓讀者一眼知道這段在講什麼。結構的邏輯（動機→機制→解法→應用）透過標題內容暗示，不透過標籤宣告。
 
 ### 跨 Q 連結
 提到前面 Q 的內容時，必須用相對路徑超連結。例：`[Q1：什麼是擴散模型](../q01-diffusion-model/)`。不可只寫「Q1 說過...」而不給連結。
@@ -75,9 +80,9 @@ Static site. Custom build.mjs converts MDX→single-page HTML. 33 Q&A pages, 4 s
 **三層對照**：每題提供 ComfyUI（通用節點解法）和 Seedance 原生（prompt/@ 標籤解法）兩套方案，讓使用不同工具的讀者都能對照。
 
 ## 約定
-- **檔案命名**: `q##-slug.mdx`，編號跨章節連續 (Q1–Q29)
+- **檔案命名**: `q##-slug.mdx`，編號跨章節連續 (Q1–Q30)
 - **Frontmatter**: `title`, `description`, `sidebar: { order: N }`
-- **內文結構**: `## 一句話` → 子章節（WHY→WHAT→HOW）→ `:::tip[🎬 導演要點]` → `:::note[📖 引用論文]`
+- **內文結構**: `## 一句話` → 子章節（動機→機制→解法，標題從內容提煉，不寫 WHY/WHAT/HOW）→ `:::tip[🎬 導演要點]` → `:::note[📖 引用論文]`
 - **標題鏈**: Part 1 標題設計為追問鏈，前半句承接上個 Q 的結論、後半句拋新問題
 - **mermaid 圖表**: 僅 Part 1 Q1 使用，其餘章節以文字或表格敘述
 - **語言**: 繁體中文，技術術語保留英文原名（括號標註）
