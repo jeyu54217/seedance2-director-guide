@@ -1,43 +1,49 @@
 ---
-title: 動作一快，人跟東西就消失（Fast Motion Warping）——快速運動的畫面崩潰
-description: Temporal Attention 在高運動幅度時 token 匹配失效——O(n²) 窗口截斷 + 位置編碼大位移失效
+title: 動作一快就出事——物體消失、背景糊掉（Fast Motion & Background Drift）
+description: Temporal Attention 在大位移時 token 匹配失效——位置編碼餘弦相似度驟降 + O(n²) 窗口截斷，物體運動和攝影機運動共享同一個根因
 sidebar:
   order: 11
 ---
 
 ## 一句話
 
-動作太快時，物體消失、邊緣模糊、畫面崩潰——[Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 跨幀 token 匹配在高速運動時失敗，[Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) 窗口截斷讓高速場景首當其衝。
+動作一快，兩種症狀：物體消失變形（人物跑太快），背景漂移模糊（攝影機動太快）。根因同一個——Temporal Attention 的 token 匹配在大位移時失效。
 
-## Temporal Attention 的 token tracker 跟丟了
+## 為什麼一快就壞？
 
-[Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 負責在相鄰幀之間匹配 token——第 1 幀「奔跑中的人的左手」要和第 2 幀「同一個人的左手」對齊。匹配的數學基礎是 [Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼：兩個 token 的空間位置 + 時間位置的餘弦相似度。
+[Q4：注意力機制](../01-basics/q04-attention/) 的 Temporal Attention 負責跨幀比對 token：第 1 幀「奔跑中的左手」要和第 2 幀「同一隻左手」對齊，第 1 幀的「背景牆壁」也要和第 5 幀的「同一面牆」對齊。比對的依據是 [Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼——兩個 token 的空間位置 + 時間位置，取餘弦相似度。
 
-**高速運動時，同一個物體在相鄰幀之間的位移過大**——位置編碼的餘弦相似度驟降到匹配閾值以下。Temporal Attention 判定「這兩個 token 不是同一個東西」→ token tracker 跟丟 → 物體從這一幀開始「消失」或「變形」。
+餘弦相似度的特性：**小位移靈敏，大位移驟降。** 物體在相鄰幀之間位移一大，相似度跌破匹配閾值，Temporal Attention 判定「這兩個 token 不是同一個東西」——token tracker 從這一幀開始跟丟。
 
-這跟 [Q24：肢體融化](q24-limb-melting/)（SNR 崩潰把肢體當雜訊砍）和 [Q27：物理失敗](q27-physics-failure/)（Physics Reward 的表面模擬）不同——這是 **token 追蹤層面的失敗**。消失的物體不是「物理上不合理地漂浮」，而是「模型的 attention tracker 直接失去了對這個物體的追蹤」。
+物體動太快 → 物體的 token 跟丟 → 手消失、臉變形、邊緣模糊。攝影機動太快 → 背景的 token 跟丟 → 牆壁漂移、家具扭曲。
 
-## O(n²) 截斷讓高速場景更脆弱
+**同一個機制，差別只在「誰在動」。** 這不是 [Q24：肢體融化](q24-limb-melting/) 的 SNR 崩潰（去噪把肢體當雜訊砍），也不是 [Q27：物理失敗](q27-physics-failure/) 的 Physics Reward 表面模擬——這是 token 追蹤層面的失敗。消失的東西不是物理不合理，而是 attention 直接跟丟了。
 
-[Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) 瓶頸（Self-Attention 佔 76% 運算）導致實際部署時 Temporal Attention 的匹配窗口被截斷為有限幀數。高速場景中物體在更少幀內位移更大——窗口內可用的匹配幀更少、位移更大 = 匹配成功率急劇下降。
+## O(n²) 窗口截斷：連試圖匹配的機會都沒有
 
-[Q14：運鏡機制](../02-seedance/q14-camera-motion/) 的預訓練視覺先驗從反面印證：訓練數據中「slow camera movement」遠多於「fast whip pan」。模型根本沒有足夠的訓練樣本學會在高速場景下維持 temporal consistency。
+[Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 揭露了根本的運算瓶頸：Self-Attention 佔 DiT 運算的 60–76%。實際部署時，Temporal Attention 的匹配窗口被截斷為有限幀數。
+
+高速場景中，物體或背景在幾幀之內就移出截斷窗口——Temporal Attention 連嘗試匹配的機會都沒有。**窗口小 + 位移大 = 雙重打擊。**
+
+[Q14：運鏡機制](../02-seedance/q14-camera-motion/) 的訓練視覺先驗從反面印證：訓練數據中 slow camera movement 遠多於 fast whip pan，慢速連續動作遠多於高速變速動作。模型根本沒看過足夠的高速樣本。
 
 ## 解法
 
-- **降低運動速度**：morphic.com 指南的結論 "walks slowly > sprints"——慢速連續運動是 Temporal Attention 的甜蜜點
-- **慢速 dolly-in 代替快速 zoom**：同樣是靠近主體，dolly-in（物理移動攝影機）在幀間位移分佈均勻，zoom（改變焦距）造成邊緣區域的非線性位移
-- 避免快速變焦和快速 whip pan——這些運鏡在訓練數據中本來就稀少
-- 在 prompt 中指定「slow, continuous movement, consistent speed」——不要只描述動作內容，也要描述動作速度
-- [Q30：背景漂移](q30-background-drift/) 的解法也適用：CameraCtrl + FreeInit + Tile ControlNet 三連提供 explicit 空間約束
+| 場景 | 做法 |
+|---|---|
+| **物體高速運動** | 降速——慢走 > 奔跑。拆成多段短鏡頭。Prompt 指定 "slow, continuous movement, consistent speed" |
+| **攝影機快速運鏡** | 慢速 dolly-in > 快速 zoom——dolly 幀間位移均勻，zoom 邊緣非線性位移更容易觸發匹配失敗 |
+| **必須高速（兩者通用）** | CameraCtrl + FreeInit + Tile ControlNet 三連：CameraCtrl 給 explicit camera path，FreeInit 重設初期雜訊強化一致性，Tile ControlNet 鎖定局部空間結構 |
 
-FreeInit 與 CameraCtrl 完整參數見 [Part 4：ComfyUI 節點速查](../04-workflow/comfyui-nodes/)，打鬥場景 preset 見 [Part 4：場景組合](../04-workflow/scene-presets/)。
+Euler sampler（[Q7：Flow Matching](../01-basics/q07-flow-matching/) 連續時間路徑比離散 DDPM 平滑），Steps ≥ 25 給 Temporal Attention 足夠的修正機會。
+
+完整參數見 [Part 4：ComfyUI 節點速查](../04-workflow/comfyui-nodes/)，打鬥與大運鏡 preset 見 [Part 4：場景組合](../04-workflow/scene-presets/)。
 
 :::tip[🎬 導演要點]
 
-快速運動 = Temporal Attention 的極限測試。模型在慢速場景中表現好不是巧合——是訓練數據分佈和 O(n²) 窗口截斷的雙重結果。
+快速 = Temporal Attention 的極限測試。物體動太快、攝影機動太快——根因同一個，解法同一套。
 
-**慢速、連續、均勻的動作 > 快速、複雜、變速的動作。** 如果需要快速動作：拆成多段短鏡頭，每段控制速度和幅度。
+**慢速、連續、均勻 > 快速、複雜、變速。** 一定要快：CameraCtrl + FreeInit + Tile ControlNet 三連 + Steps ≥ 25。
 
 :::
 
@@ -49,4 +55,6 @@ FreeInit 與 CameraCtrl 完整參數見 [Part 4：ComfyUI 節點速查](../04-wo
 [DiT (Peebles & Xie, ICCV 2023, §3.2)](https://arxiv.org/abs/2212.09748) — 位置編碼與 token 匹配。
 
 [Seedance 1.5 Pro §3–4](https://arxiv.org/abs/2512.13507) — 預訓練視覺先驗分佈。
+
+[Controllable Video Survey (Ma et al., §4.2)](https://arxiv.org/abs/2507.16869) — CameraCtrl 與運鏡控制。
 :::
