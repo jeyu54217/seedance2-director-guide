@@ -17,23 +17,31 @@ sidebar:
 
 ## 三種 Attention，三種協調
 
-影片被切成 token（[Q3：圖像區塊化](../01-basics/q03-patchify/)），這些 token 需要三層協調才能變成連貫的影片：
+影片被切成 token（[Q3：圖像區塊化](../01-basics/q03-patchify/)），這些 token 需要三層協調才能變成連貫的影片。三種 Attention 在 DiT 的每一個 Transformer block 中同時運作，從 step 999 到 step 0，每一層、每一步。
 
-Self-Attention 管畫面內的協調。同一幀內，所有 token 互相對看——手的 token 看臉的 token、背景 token 看人物 token。這確保同一幀內各部分彼此一致：手和臉屬於同一個人，光源從同一個方向來。沒這層，畫面會分裂成互不相干的碎片。
+### Self-Attention：畫面內
 
-Cross-Attention 管接收外部指令。這是導演和模型對話的地方。Prompt 文字先被 Text Encoder 轉成語意向量，參考圖被 VAE 轉成視覺 token——兩者都從這裡注入。每一步去噪，noise token 透過 Cross-Attention 查閱這些外部指令，逐步修正方向。[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的角色鎖定、prompt 的場景描述——全走這條路。
+同一幀內，所有 token 互相對看——手的 token 看臉的 token、背景 token 看人物 token。這確保同一幀內各部分彼此一致：手和臉屬於同一個人，光源從同一個方向來。沒這層，畫面會分裂成互不相干的碎片。
 
-Cross-Attention 依賴 Text Encoder 的輸出。CLIP 在數億組圖文配對上訓練，對視覺詞敏感、對抽象詞較弱，有 **77 token 上限**——超過截斷，關鍵詞放前面。這不是 Attention 的限制，是上游編碼器的限制，但直接影響 Cross-Attention 接收到的指令品質。
+### Cross-Attention：接指令
 
-Temporal Attention 管跨時間的協調。不同幀的 token 互相對看——第 1 幀的左手和第 5 幀的左手比對，確認是同一隻手；第 10 幀的牆壁和第 50 幀的同一面牆對齊。動作連貫、鏡頭穩定、背景不漂移——全靠這層。
+這是導演和模型對話的地方。Prompt 文字先被 Text Encoder 轉成語意向量，參考圖被 VAE 轉成視覺 token——兩者都從這裡注入。每一步去噪，noise token 透過 Cross-Attention 查閱這些外部指令，逐步修正方向。[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的角色鎖定、prompt 的場景描述——全走這條路。
 
-三種 Attention 在 DiT 的每一個 Transformer block 中同時運作，從 step 999 到 step 0，每一層、每一步。
+Cross-Attention 依賴 Text Encoder 的輸出。CLIP 在數億組圖文配對上訓練，對視覺詞敏感、對抽象詞較弱，有 **77 token 上限**——超過截斷，關鍵詞放前面。
+
+### Temporal Attention：跨時間
+
+不同幀的 token 互相對看——第 1 幀的左手和第 5 幀的左手比對，確認是同一隻手；第 10 幀的牆壁和第 50 幀的同一面牆對齊。動作連貫、鏡頭穩定、背景不漂移——全靠這層。
 
 ## 兩個關鍵區別
 
-ControlNet 不走 Cross-Attention。ControlNet 有自己獨立的 encoder，透過 residual connection 直接把結構訊號（骨架、深度圖）注入 latent，不走 Cross-Attention 的 Key/Value 查閱路徑。這代表 ControlNet 給的是「硬約束」，跟 prompt 文字引導互不干擾——可以疊加使用。
+### ControlNet 不走 Cross-Attention
 
-IP-Adapter 走解耦 Cross-Attention。 一般 Cross-Attention 中 prompt 文字和參考圖共享同一組 Key/Value，容易互相干擾。IP-Adapter 在 Cross-Attention 層新增一組獨立的 Key/Value，專門給參考圖用——文字歸文字、圖片歸圖片，隔離更乾淨。這是 [Q23：Identity Drift](../../03-diagnosis/q23-identity-drift/) 解法（IP-Adapter FaceID）的機制基礎。
+ControlNet 有自己獨立的 encoder，透過 residual connection 直接把結構訊號（骨架、深度圖）注入 latent，不走 Cross-Attention 的 Key/Value 查閱路徑。這代表 ControlNet 給的是「硬約束」，跟 prompt 文字引導互不干擾——可以疊加使用。
+
+### IP-Adapter 走解耦 Cross-Attention
+
+一般 Cross-Attention 中 prompt 文字和參考圖共享同一組 Key/Value，容易互相干擾。IP-Adapter 在 Cross-Attention 層新增一組獨立的 Key/Value，專門給參考圖用——文字歸文字、圖片歸圖片，隔離更乾淨。這是 [Q23：Identity Drift](../../03-diagnosis/q23-identity-drift/) 解法（IP-Adapter FaceID）的機制基礎。
 
 :::tip[🎬 導演要點]
 
