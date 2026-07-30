@@ -25,9 +25,9 @@ ComfyUI 節點在 DiT pipeline 的不同層介入——Cross-Attention 層注入
 
 | 節點 | 參數 | 用途 | 對應 Q |
 |---|---|---|---|
-| **IP-Adapter FaceID Plus V2** | weight **0.8–0.9** | 每步去噪強制注入面部 identity embedding | [Q23](../03-diagnosis/q23-identity-drift/) |
-| **FaceDetailer** | denoise **0.2–0.35** | 去噪後段局部修復面部區域 | [Q23](../03-diagnosis/q23-identity-drift/) |
-| **Multiple IP-Adapters** | 每個角色獨立 weight，色系差異最大化 | 多角色各自獨立身份注入 | [Q28](../03-diagnosis/q28-feature-bleeding/) |
+| **IP-Adapter FaceID Plus V2** | weight **0.8–0.9** | 每步去噪強制注入面部 identity embedding | [Q21](../03-diagnosis/q21-identity-drift/) |
+| **FaceDetailer** | denoise **0.2–0.35** | 去噪後段局部修復面部區域 | [Q21](../03-diagnosis/q21-identity-drift/) |
+| **Multiple IP-Adapters** | 每個角色獨立 weight，色系差異最大化 | 多角色各自獨立身份注入 | [Q23](../03-diagnosis/q23-feature-bleeding/) |
 
 ### Residual Injection 層（ControlNet 系）
 
@@ -35,9 +35,9 @@ ControlNet 走獨立 encoder + residual injection，不走 Cross-Attention 文�
 
 | 節點 | 參數 | 用途 | 對應 Q |
 |---|---|---|---|
-| **DWPose Full Body** | strength **0.5–0.6**, start=**0.0**, end=**0.7** | 骨骼/姿態結構約束（前段介入，後段放手） | [Q24](../03-diagnosis/q24-limb-melting/) |
-| **Depth Anything V2** | 同上，與 DWPose 疊加雙 ControlNet | 深度空間約束，防止肢體融化 | [Q24](../03-diagnosis/q24-limb-melting/), [Q27](../03-diagnosis/q27-physics-failure/) |
-| **ZoeDepth** | 疊加 Tile ControlNet，用於複雜場景 | 深度估計輔助 | [Q27](../03-diagnosis/q27-physics-failure/) |
+| **DWPose Full Body** | strength **0.5–0.6**, start=**0.0**, end=**0.7** | 骨骼/姿態結構約束（前段介入，後段放手） | [Q20](../03-diagnosis/q20-limb-melting/) |
+| **Depth Anything V2** | 同上，與 DWPose 疊加雙 ControlNet | 深度空間約束，防止肢體融化 | [Q20](../03-diagnosis/q20-limb-melting/), [Q25](../03-diagnosis/q25-physics-failure/) |
+| **ZoeDepth** | 疊加 Tile ControlNet，用於複雜場景 | 深度估計輔助 | [Q25](../03-diagnosis/q25-physics-failure/) |
 | **Tile ControlNet** | 與 CameraCtrl + FreeInit 疊加 | 鎖定局部空間結構，防止運鏡時背景漂移 | [Q30](../03-diagnosis/q30-background-drift/) |
 | **CameraCtrl** | 搭配 FreeInit（預設）+ Euler sampler, Steps ≥ 25 | 提供 explicit camera path 約束 | [Q14](../02-seedance/q14-camera-motion/), [Q30](../03-diagnosis/q30-background-drift/) |
 
@@ -45,21 +45,21 @@ ControlNet 走獨立 encoder + residual injection，不走 Cross-Attention 文�
 
 | 節點 | 參數 | 用途 | 對應 Q |
 |---|---|---|---|
-| **RescaleCFG** | **0.5–0.7** | 去噪後段自動降 CFG，防止 SNR 崩潰（肢體/色彩域） | [Q5](../01-basics/q05-cfg/), [Q22](../03-diagnosis/q22-flicker/), [Q24](../03-diagnosis/q24-limb-melting/) |
-| **FreeInit** | filter_type=**gaussian**（預設參數） | 重設初期噪聲，強化 Temporal Attention 跨幀一致性，抑制閃爍/抖動/漂移 | [Q22](../03-diagnosis/q22-flicker/), [Q29](../03-diagnosis/q29-fast-motion/), [Q30](../03-diagnosis/q30-background-drift/) |
-| **Dynamic Thresholding** | 每步限制去噪極端值 | ComfyUI 額外防線，防止色彩過飽和與亮度突變 | [Q22](../03-diagnosis/q22-flicker/) |
+| **RescaleCFG** | **0.5–0.7** | 去噪後段自動降 CFG，防止 SNR 崩潰（肢體/色彩域） | [Q5](../01-basics/q05-cfg/), [Q26](../03-diagnosis/q26-flicker/), [Q20](../03-diagnosis/q20-limb-melting/) |
+| **FreeInit** | filter_type=**gaussian**（預設參數） | 重設初期噪聲，強化 Temporal Attention 跨幀一致性，抑制閃爍/抖動/漂移 | [Q26](../03-diagnosis/q26-flicker/), [Q22](../03-diagnosis/q22-fast-motion/), [Q30](../03-diagnosis/q30-background-drift/) |
+| **Dynamic Thresholding** | 每步限制去噪極端值 | ComfyUI 額外防線，防止色彩過飽和與亮度突變 | [Q26](../03-diagnosis/q26-flicker/) |
 
 ### 空間隔離層
 
 | 節點 | 參數 | 用途 | 對應 Q |
 |---|---|---|---|
-| **Regional Prompting + SAM** | SAM 預分割畫面，每個 IP-Adapter 只綁定對應 mask 區域 | 多角色 spatial localized injection，不走 Cross-Attention 全域查閱 | [Q28](../03-diagnosis/q28-feature-bleeding/) |
+| **Regional Prompting + SAM** | SAM 預分割畫面，每個 IP-Adapter 只綁定對應 mask 區域 | 多角色 spatial localized injection，不走 Cross-Attention 全域查閱 | [Q23](../03-diagnosis/q23-feature-bleeding/) |
 
 ### 音訊層
 
 | 節點 | 參數 | 用途 | 對應 Q |
 |---|---|---|---|
-| **AudioScheduler** | `audio_priority = "upload"` | 優先使用上傳音訊而非參考影片內嵌音軌 | [Q20](../03-diagnosis/q20-audio-contamination/) |
+| **AudioScheduler** | `audio_priority = "upload"` | 優先使用上傳音訊而非參考影片內嵌音軌 | [Q30](../03-diagnosis/q30-audio-contamination/) |
 
 ### 後處理層
 

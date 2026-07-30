@@ -2,7 +2,7 @@
 title: 動作一快就出事——物體消失、背景糊掉（Fast Motion & Background Drift）
 description: Temporal Attention 在大位移時 token 匹配失效——位置編碼餘弦相似度驟降 + O(n²) 窗口截斷，物體運動和攝影機運動共享同一個根因
 sidebar:
-  order: 11
+  order: 3
 ---
 
 ## 一句話
@@ -17,7 +17,7 @@ sidebar:
 
 物體動太快 → 物體的 token 跟丟 → 手消失、臉變形、邊緣模糊。攝影機動太快 → 背景的 token 跟丟 → 牆壁漂移、家具扭曲。
 
-**同一個機制，差別只在「誰在動」。** 這不是 [Q24：肢體融化](q24-limb-melting/) 的 SNR 崩潰（去噪把肢體當雜訊砍），也不是 [Q27：物理失敗](q27-physics-failure/) 的 Physics Reward 表面模擬——這是 token 追蹤層面的失敗。消失的東西不是物理不合理，而是 attention 直接跟丟了。
+**同一個機制，差別只在「誰在動」。** 這不是 [Q24：肢體融化](q20-limb-melting/) 的 SNR 崩潰（去噪把肢體當雜訊砍），也不是 [Q27：物理失敗](q25-physics-failure/) 的 Physics Reward 表面模擬——這是 token 追蹤層面的失敗。消失的東西不是物理不合理，而是 attention 直接跟丟了。
 
 ## O(n²) 窗口截斷：連試圖匹配的機會都沒有
 

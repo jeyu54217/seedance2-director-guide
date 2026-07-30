@@ -14,7 +14,7 @@ Seedance 2.0 的限制不是 bug，是 DiT 架構的固有取捨。每個限制�
 三條架構現實決定了大部分限制：
 
 1. **Self-Attention 的 O(n²) 運算**：token 數量平方成長——[Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 量化了這個瓶頸（Wan2.1 中 self-attention 佔 DiT block 運算的 76%，Mochi-1 中佔 60%）。O(n²) 迫使 Temporal Attention 截斷窗口，高速運動時 token tracker 跟丟。
-2. **VAE 感知壓縮（f=8）**：把「人眼不敏感的高頻細節」當可拋棄資訊丟掉——文字筆畫、手指關節、暗部紋理在 latent space 中變成模糊色塊——[Q2：潛在空間](../01-basics/q02-latent-space/) 和 [Q26：文字渲染](../03-diagnosis/q26-text-rendering/) 解釋了機制的後果。
+2. **VAE 感知壓縮（f=8）**：把「人眼不敏感的高頻細節」當可拋棄資訊丟掉——文字筆畫、手指關節、暗部紋理在 latent space 中變成模糊色塊——[Q2：潛在空間](../01-basics/q02-latent-space/) 和 [Q28：文字渲染](../03-diagnosis/q28-text-rendering/) 解釋了機制的後果。
 3. **Patchify 的顆粒度（2×2）**：每個 token 覆蓋 2×2 語意網格，一個中文字被切碎成多個 token，模型沒有字符級理解——[Q3：Patchify](../01-basics/q03-patchify-dit/)。
 
 其餘限制來自訓練資料分布和平台政策。
@@ -24,12 +24,12 @@ Seedance 2.0 的限制不是 bug，是 DiT 架構的固有取捨。每個限制�
 | 限制 | 架構原因 | 替代方案 |
 |---|---|---|
 | **最長 15 秒** | Self-Attention O(n²)：15s ≈ 30–45 萬 token | 每鏡頭 8–12s 最穩。Seedance 2.5（2026/06）原生 30s 4K，稀疏注意力降至 ~O(n log n)。見 [Q13](../02-seedance/q13-15sec-limit/) |
-| **文字渲染失敗**（招牌、字幕亂碼） | VAE f=8 壓縮文字邊緣 + Patchify 無字符級理解 | 唯一可靠解法：生成後疊加文字。見 [Q26](../03-diagnosis/q26-text-rendering/) |
-| **肢體融化**（多手多腳、手指錯誤） | 高 CFG（>12）導致 SNR 崩潰：去噪後段把肢體訊號連同雜訊砍掉 | CFG ≤ 7，RescaleCFG 0.5–0.7，DWPose + Depth 雙 ControlNet。見 [Q24](../03-diagnosis/q24-limb-melting/) |
-| **快速動作崩潰**（物體消失、邊緣模糊） | Temporal Attention 窗口截斷：高速運動時 token tracker 跟丟 | 慢速連續運動，dolly-in 取代 zoom。見 [Q29](../03-diagnosis/q29-fast-motion/) |
-| **背景漂移**（運鏡時背景跟丟） | Temporal Attention 窗口失效：背景 token 移出匹配範圍 | CameraCtrl + FreeInit + Tile ControlNet + Euler sampler + Steps ≥ 25。見 [Q30](../03-diagnosis/q30-background-drift/) |
-| **特徵滲透**（角色 A 的紅衣染到角色 B） | Cross-Attention softmax 在色系接近時路由混淆 | 角色色系差異最大化，≤2 角色，SAM 區域隔離。見 [Q28](../03-diagnosis/q28-feature-bleeding/) |
-| **跨鏡頭場景不連戲**（換鏡頭背景全變） | 背景物體無 identity embedding，每 shot 獨立生成 | Scene bible 重複寫入環境描述，背景參考圖 + Tile ControlNet。見 [Q31](../03-diagnosis/q31-cross-shot-background/) |
+| **文字渲染失敗**（招牌、字幕亂碼） | VAE f=8 壓縮文字邊緣 + Patchify 無字符級理解 | 唯一可靠解法：生成後疊加文字。見 [Q28](../03-diagnosis/q28-text-rendering/) |
+| **肢體融化**（多手多腳、手指錯誤） | 高 CFG（>12）導致 SNR 崩潰：去噪後段把肢體訊號連同雜訊砍掉 | CFG ≤ 7，RescaleCFG 0.5–0.7，DWPose + Depth 雙 ControlNet。見 [Q20](../03-diagnosis/q20-limb-melting/) |
+| **快速動作崩潰**（物體消失、邊緣模糊） | Temporal Attention 窗口截斷：高速運動時 token tracker 跟丟 | 慢速連續運動，dolly-in 取代 zoom。見 [Q22](../03-diagnosis/q22-fast-motion/) |
+| **背景漂移**（運鏡時背景跟丟） | Temporal Attention 窗口失效：背景 token 移出匹配範圍 | CameraCtrl + FreeInit + Tile ControlNet + Euler sampler + Steps ≥ 25。見 [Q29](../03-diagnosis/q29-cross-shot-background/) |
+| **特徵滲透**（角色 A 的紅衣染到角色 B） | Cross-Attention softmax 在色系接近時路由混淆 | 角色色系差異最大化，≤2 角色，SAM 區域隔離。見 [Q23](../03-diagnosis/q23-feature-bleeding/) |
+| **跨鏡頭場景不連戲**（換鏡頭背景全變） | 背景物體無 identity embedding，每 shot 獨立生成 | Scene bible 重複寫入環境描述，背景參考圖 + Tile ControlNet。見 [Q29](../03-diagnosis/q29-cross-shot-background/) |
 | **原生解析度 480p/720p** | 訓練與推理的運算取捨 | Standard 方案 1080p；720p → Topaz/RealESRGAN 升頻。Seedance 2.5 原生 4K |
 
 ## 訓練與資料偏差
@@ -40,26 +40,26 @@ Seedance 2.0 的限制不是 bug，是 DiT 架構的固有取捨。每個限制�
 | **中文 prompt 覆蓋率更高** | 訓練資料以中文影片為主（抖音、西瓜視頻） | 英文攝影術語可用；古風/武俠/江湖等文化概念中文遠優於英文。見 [Q18](../02-seedance/q18-zh-en-prompt/) |
 | **CLIP 77 token 上限** | Text Encoder（CLIP）的輸入長度限制 | 關鍵資訊放 prompt 最前面。見 [Q4：注意力機制](../01-basics/q04-attention/) |
 | **慢速運鏡偏見** | 訓練資料中慢速運鏡遠多於快速 whip pan | 預設就有輕微運鏡（視覺先驗），要靜止需明確寫 "static shot, locked-off camera"。見 [Q14](../02-seedance/q14-camera-motion/) |
-| **物理理解不穩健**（事件轉換僅 53.5%） | Reward hacking：模型最大化 Physics Reward 分數，非內化物理定律 | 簡單場景信任模型，複雜場景 ControlNet + Depth 雙重約束。見 [Q27](../03-diagnosis/q27-physics-failure/) |
+| **物理理解不穩健**（事件轉換僅 53.5%） | Reward hacking：模型最大化 Physics Reward 分數，非內化物理定律 | 簡單場景信任模型，複雜場景 ControlNet + Depth 雙重約束。見 [Q25](../03-diagnosis/q25-physics-failure/) |
 
 ## 平台與政策限制
 
 | 限制 | 原因 | 替代方案 |
 |---|---|---|
 | **無 LoRA 支援** | Seedance 2.0 未開放權重微調；2.5 LoRA 狀態未確認 | 多張高品質參考圖 + IP-Adapter 補強 |
-| **安全過濾器波動**（同 prompt 昨天可以今天不行） | Safety reward model 嵌入推理 pipeline，非靜態規則 | 原創角色（非真人/公眾人物），網格覆蓋法，不同平台嚴格度不同。見 [Q21](../03-diagnosis/q21-safety-filter/) |
+| **安全過濾器波動**（同 prompt 昨天可以今天不行） | Safety reward model 嵌入推理 pipeline，非靜態規則 | 原創角色（非真人/公眾人物），網格覆蓋法，不同平台嚴格度不同。見 [Q31](../03-diagnosis/q31-safety-filter/) |
 | **版權過濾（face detection）** | Pattern-match 已知身份 | 原創角色；極端情況改用 Kling 3.0 |
 | **雙分支音畫無法在 ComfyUI 重現** | 雙分支 DiT 是訓練階段嵌入的機制，推理端無法複製 | 級聯：影片 → MMAudio/AudioLDM 生成音效。見 [Q10](../02-seedance/q10-dual-branch/) |
-| **唇形同步是 text-driven 而非 audio-driven** | Phoneme timing 從 prompt 對白文字生成，非從音檔提取 | 對白 ≤12 詞/10s，時間標籤 `[00:01-00:03]`，句子間加停頓錨點。見 [Q25](../03-diagnosis/q25-lip-sync/) |
+| **唇形同步是 text-driven 而非 audio-driven** | Phoneme timing 從 prompt 對白文字生成，非從音檔提取 | 對白 ≤12 詞/10s，時間標籤 `[00:01-00:03]`，句子間加停頓錨點。見 [Q24](../03-diagnosis/q24-lip-sync/) |
 
 ## 萬用解決方案速查
 
 | 問題類型 | 最小有效組合 | 詳見 |
 |---|---|---|
-| 肢體/物理 | CFG ≤ 7 + RescaleCFG 0.5–0.7 + DWPose + Depth 雙 ControlNet | [Q24](../03-diagnosis/q24-limb-melting/) |
-| 閃爍/運鏡 | FreeInit（預設）+ Euler sampler + Steps ≥ 25 | [Q22](../03-diagnosis/q22-flicker/), [Q30](../03-diagnosis/q30-background-drift/) |
-| 角色鎖定 | IP-Adapter FaceID Plus V2（0.8–0.9）+ FaceDetailer（denoise 0.2–0.35） | [Q23](../03-diagnosis/q23-identity-drift/) |
-| 多角色隔離 | Regional Prompting + SAM + 獨立 IP-Adapter | [Q28](../03-diagnosis/q28-feature-bleeding/) |
+| 肢體/物理 | CFG ≤ 7 + RescaleCFG 0.5–0.7 + DWPose + Depth 雙 ControlNet | [Q20](../03-diagnosis/q20-limb-melting/) |
+| 閃爍/運鏡 | FreeInit（預設）+ Euler sampler + Steps ≥ 25 | [Q26](../03-diagnosis/q26-flicker/), [Q22](../03-diagnosis/q22-fast-motion/) |
+| 角色鎖定 | IP-Adapter FaceID Plus V2（0.8–0.9）+ FaceDetailer（denoise 0.2–0.35） | [Q21](../03-diagnosis/q21-identity-drift/) |
+| 多角色隔離 | Regional Prompting + SAM + 獨立 IP-Adapter | [Q23](../03-diagnosis/q23-feature-bleeding/) |
 
 :::tip[🎬 導演要點]
 

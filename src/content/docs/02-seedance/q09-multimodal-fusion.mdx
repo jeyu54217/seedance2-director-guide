@@ -29,7 +29,7 @@ sidebar:
 
 文字和參考圖有協同效果。Joint Attention 讓文字 token 和視覺 token 在同一層交換資訊——寫 `"@image1 的角色站在黃昏沙灘上"` 比先畫角色再加背景有效，文字語意直接疊加在視覺特徵上。
 
-多素材隔離靠特徵距離。素材色系差異越大（紅 vs 藍 >> 紅 vs 橘），特徵向量在 Attention 空間中距離越遠，隔離越乾淨。兩個黑髮角色同時引用，特徵容易混淆——這是 Identity Drift 的機制根源（見 [Q23：身分漂移](../../03-diagnosis/q23-identity-drift/)）。
+多素材隔離靠特徵距離。素材色系差異越大（紅 vs 藍 >> 紅 vs 橘），特徵向量在 Attention 空間中距離越遠，隔離越乾淨。兩個黑髮角色同時引用，特徵容易混淆——這是 Identity Drift 的機制根源（見 [Q23：身分漂移](../../03-diagnosis/q21-identity-drift/)）。
 
 Prompt 具體程度決定融合強度：「午後陽光從窗戶斜射進來，地上長方形光斑」>「溫暖的房間」。
 
@@ -37,7 +37,7 @@ Prompt 具體程度決定融合強度：「午後陽光從窗戶斜射進來，�
 
 Joint Attention 是 Seedance 跨模態一致性的根基——參考圖角色不變臉不是靠後製，是靠每一步持續對齊。
 
-素材上限來自注意力資源分配，不是硬體限制。兩個角色是甜蜜點，三個以上 Identity 開始漂移——每個新增角色分走一部分 Attention 權重（見 [Q28：多角色混淆](../../03-diagnosis/q28-feature-bleeding/)）。
+素材上限來自注意力資源分配，不是硬體限制。兩個角色是甜蜜點，三個以上 Identity 開始漂移——每個新增角色分走一部分 Attention 權重（見 [Q28：多角色混淆](../../03-diagnosis/q23-feature-bleeding/)）。
 
 雜亂背景會被當成 identity 特徵一起編碼——參考圖請用純色背景正面特寫。
 

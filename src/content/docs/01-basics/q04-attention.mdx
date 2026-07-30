@@ -41,7 +41,7 @@ ControlNet 有自己獨立的 encoder，透過 residual connection 直接把結�
 
 ### IP-Adapter 走解耦 Cross-Attention
 
-一般 Cross-Attention 中 prompt 文字和參考圖共享同一組 Key/Value，容易互相干擾。IP-Adapter 在 Cross-Attention 層新增一組獨立的 Key/Value，專門給參考圖用——文字歸文字、圖片歸圖片，隔離更乾淨。這是 [Q23：Identity Drift](../../03-diagnosis/q23-identity-drift/) 解法（IP-Adapter FaceID）的機制基礎。
+一般 Cross-Attention 中 prompt 文字和參考圖共享同一組 Key/Value，容易互相干擾。IP-Adapter 在 Cross-Attention 層新增一組獨立的 Key/Value，專門給參考圖用——文字歸文字、圖片歸圖片，隔離更乾淨。這是 [Q23：Identity Drift](../../03-diagnosis/q21-identity-drift/) 解法（IP-Adapter FaceID）的機制基礎。
 
 :::tip[🎬 導演要點]
 
