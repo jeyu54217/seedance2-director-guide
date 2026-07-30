@@ -21,7 +21,7 @@ sidebar:
 
 **條件一：解析度或長寬比變動。** [Q6](../01-basics/q06-timestep/) 的位置編碼依賴固定的 patch 網格——長寬比一換，網格重算，所有 token 的空間座標重新分配。Cross-Attention 在上一個鏡頭建立的 Key/Value 參考點，在新網格中對應不到原來的空間位置。
 
-**條件二：Extension 鏈累積劣化。** [Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) Self-Attention 瓶頸意味著長序列不只是「更多幀」——是 token 數量平方成長的運算壓力。實際部署時 Temporal Attention 窗口被截斷以控制計算量，extension 6 次以上的 contextual memory 嚴重衰減。[Q16：Storyboard](../02-seedance/q16-storyboard/) 的 Shot Decomposition 機制也證實：每個 shot 是獨立生成的，不是真正連續——extension 是「生成下一個 shot 並試圖匹配上一個」，而非「繼續生成同一個序列」。
+**條件二：Extension 鏈累積劣化。** [Q13：15 秒限制](../02-seedance/q13-15sec-limit/) 的 O(n²) Self-Attention 瓶頸意味著長序列不只是「更多幀」——是 token 數量平方成長的運算壓力。實際部署時 Temporal Attention 窗口被截斷以控制計算量，extension 6 次以上的 contextual memory 嚴重衰減。[Q16：Storyboard](../02-seedance/q16-storyboard/) 說明了 multi-shot 架構的本質：每個 shot 有自己的 visual condition 在 denoising 中同時處理，shot 之間的過渡由 Temporal Attention 補出——但 extension 不同於原生 multi-shot，每次 extension 是新的 denoising pass，contextual memory 無法跨 denoising session 完整繼承。
 
 ## HOW
 

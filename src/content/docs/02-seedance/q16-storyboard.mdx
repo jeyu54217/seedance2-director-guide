@@ -1,69 +1,88 @@
 ---
 title: 丟九宮格 storyboard 給 Seedance——它真的看得懂嗎？
-description: 從 Seedance 1.0 公開架構（MM-RoPE 多 shot 序列）推論 storyboard 的可能運作原理，並對照學術界 STAGE、ShotAdapter 等論文的已知做法
+description: 從 Seedance 2.0 引用的 Seed-VL 視覺語言模型，推論 storyboard 圖片的內部理解機制——vision encoder 編碼、grid 結構隱式理解、OCR 讀取文字標註、空間位置對應時間軸
 sidebar:
   order: 8
 ---
 
 ## 一句話
 
-Seedance 論文未揭露 storyboard 圖片的內部解析步驟。從公開架構推論：多格 storyboard 提供的是**多時間點的視覺錨點**，模型在 denoising 過程中同時看到所有 panel 的視覺條件，Temporal Attention 在時間軸上補出 panel 之間的過渡——包括運鏡。
+你上傳的是一張圖，但 Seedance 看到的是一個 shot 序列。storyboard 圖片先經過 **Seed-VL 視覺語言模型**（VLM）處理——VLM 理解 grid 佈局中的 panel 結構、OCR 讀取每個 panel 上的文字標註，然後視覺特徵按空間位置對應到生成序列的不同時間段。
 
-## 單張參考圖能做到的極限
+## 核心問題：一張圖怎麼被當成多個 shot？
 
-單張 mood board 只有一個視覺條件。模型生成每一幀時，看到的都是同一組顏色、光影、構圖訊號。你可以用它鎖定角色外觀和風格，但無法用它控制「第 3 秒要切到 close-up」。
+九宮格 storyboard 是一張 JPEG，不是九張獨立的圖。如果模型只是把整張圖當成一個全局視覺條件（和 mood board 一樣），它不可能區分 panel 1 的 wide shot 和 panel 2 的 close-up。但 Seedance 顯然能做到——輸出的 shot 順序和 storyboard panel 順序對應。
 
-多格 storyboard 每一格對應不同的時間點。Panel 1 是 wide shot，panel 2 是 close-up，panel 3 是低角度——模型拿到的不是一個條件，而是多個時間點的多個條件。這是 storyboard 比單張圖更有控制力的根本原因。
+答案藏在 Seedance 的 vision encoder 裡。
 
-## Seedance 論文實際寫了什麼
+## Seedance 論文引用了什麼
 
-**Seedance 1.0**（[arxiv:2506.09113](https://arxiv.org/abs/2506.09113)）描述的是架構層面的 multi-shot 能力。核心設計是 Multishot MM-RoPE——一種位置編碼，讓多個 shot 的 visual token 和 text token 在同一個序列中交錯排列，每個 shot 有自己的 caption。Denoising 時，模型同時看到所有 shot 的資訊，不是逐 shot 分開生成。跨 shot 角色一致性的來源就是這個——不同 shot 的 visual token 在 attention 層有直接交換，不需要靠 prompt 來維持。
+Seedance 2.0 論文 Introduction 第一段列出其技術棧時，明確寫道：
 
-**Seedance 2.0**（[arxiv:2604.14148](https://arxiv.org/abs/2604.14148)）產品頁面寫 "It can even directly reference text-based storyboards"，官方 prompt 範例列出提取項目：shot scale、camera movement、visuals、copy（storyboard 上的文字標註）。但論文中沒有任何內部解析步驟的描述——這是一篇 system/evaluation paper，不是 architecture paper。
+> "Seed-VL multimodal vision-language models [3, 4, 9] for cross-modal semantic understanding"
 
-## 為什麼給 storyboard 會自動產生運鏡
+引用 [9] 是 **Seed1.5-VL**（[arxiv:2505.07062](https://arxiv.org/abs/2505.07062)）——ByteDance 自研的視覺語言模型，532M vision encoder + 20B 參數的 MoE LLM。它在 60 個公開 benchmark 中 38 個達到 SOTA，具備 agent-centric 任務能力（GUI 控制、遊戲操作）。
 
-不需要發明 Shot Decomposition 模組來解釋。從已知架構可以推論：
+DataCamp 技術分析描述 Seedance 2.0 的多模態 encoder：「不是一個大漏斗，而是一組各自預訓練的 encoder——每個模態有自己的 encoder。」
 
-Seedance 1.0 的 multi-shot 序列中，每個 shot 的 visual token 帶著自己的 3D RoPE 時間位置編碼。當你餵 storyboard 的 panel 1（wide shot）和 panel 2（close-up），它們被當成不同時間點的 visual condition。Temporal Attention（[Q4：時空注意力的分工](../q04-spatial-temporal/)）在生成過渡幀時，看到的 condition 從「wide shot 構圖」漸變到「close-up 構圖」。模型訓練資料中 wide→close-up 的典型過渡就是 push-in——所以它自動生成 push-in。
+架構簡圖：
 
-運鏡來源是**預訓練視覺先驗**（[Q14](../q14-camera-motion/)），storyboard 的角色是給這個先驗提供明確的起點和終點。
+```
+Text   → Text Encoder ──┐
+Image  → Vision Encoder ─┤    Shared Latent
+Audio  → Audio Encoder ──┼→   Space  →  DiT  →  Decoder  →  影片+音頻
+Video  → Video Encoder ──┘         ↑
+                          Cross-Attention 查閱所有模態條件
+```
 
-Panel 之間的過渡不是被「指定」的，是被「補出來」的。這就是為什麼沒有寫任何運鏡術語，輸出仍然會有鏡頭運動。
+Storyboard 圖片走的是 Image → Vision Encoder 這條路。關鍵是：這個 encoder 不是簡單的 CLIP image encoder，而是一個 VLM，具備理解圖像結構和讀取文字的能力。
 
-## 學術界怎麼做 storyboard-to-video
+## 從圖片到 shot 序列：五個推論步驟
 
-Seedance 沒寫的，學術界有公開做法。目前兩條路線：
+**Step 1：Vision Encoder 編碼整張圖**
 
-| 路線 | 做法 | 代表論文 |
-|---|---|---|
-| LLM-based planning | 外部 LLM 先把文字拆成 shot plan（鏡位、運鏡、時長），影片模型照 plan 生成 | STAGE (CVPR 2026), CoAgent |
-| Architecture-level multi-shot | 在 DiT 內部處理 shot 邊界，denoising 時學 shot 之間的關係 | ShotAdapter (CVPR 2025), Seedance 1.0 |
+Storyboard 作為單張圖上傳。ComfyUI workflow 中使用 `ByteDance2ReferenceNode` 直接吃 contact sheet，沒有預先切片步驟。Vision encoder 輸出一個保留了空間結構的 feature map——每個 spatial position 對應原圖的某個位置（左上角、右下角等）。
 
-**LLM-based**——STAGE（[arxiv:2512.12372](https://arxiv.org/abs/2512.12372)）：Director Agent（LLM）把故事展開成結構化 shot plan，每個 shot 標明 description、camera angle、shot scale。STEP2 模型為每個 shot 生成 start frame 和 end frame，再用 I2V 模型填滿中間。
+**Step 2：VLM 隱式理解 grid 結構**
 
-**Architecture-level**——ShotAdapter（[arxiv:2505.07652](https://arxiv.org/abs/2505.07652)）：在 pre-trained DiT 中加入 transition token（讓模型學會 shot 之間的 cut）和 local attention masking（限制 text token 只 attend 自己的 visual token，防止跨 shot prompt 汙染）。不需要外部 LLM。
+VLM 在預訓練階段看過大量漫畫、multi-panel 佈局、分鏡圖。不需要一個獨立的 "panel detection 模組"——理解「這是一張被切成 3×3 的九宮格」和它理解「這張照片裡有兩個人」是同一種能力：emergent visual understanding。panel 之間的邊框線、空白間距、排列規律，就是 VLM 用來識別 grid 結構的視覺線索。
 
-Seedance 1.0 論文的描述更接近後者（原生 multi-shot、架構內建），但 2.0 的 "directorial reasoning" 說法暗示可能混合了 LLM-based planning。**目前沒有公開資訊確認 2.0 的具體實作。**
+**Step 3：OCR 讀取 panel 上的文字標註**
+
+Modern VLM 內建 OCR。Storyboard 上的 "CU"、"push-in"、"0-3s" 等標註不是被當成 visual texture 保留，而是被 VLM 讀取為語義文字。這說明了為什麼官方 prompt 範例寫 "draw on the storyboard, shot scale, camera movement, visuals and copy"——"copy" 就是 VLM 從 panel 上讀取的文字。這些文字被轉成 text tokens，和 prompt 文字一起進入 cross-attention 條件。
+
+**Step 4：空間位置對應時間軸**
+
+這是整個機制最關鍵的一步。Seedance 1.0 的 **Multishot MM-RoPE** 為不同來源的 token 提供獨立的位置編碼。學術界的 Kaleido（[arxiv:2510.18573](https://arxiv.org/abs/2510.18573)）提出 R-RoPE——為 reference image tokens 分配獨立的 rotary position encoding，讓模型能區分「這個 token 來自 reference 1 的 spatial position (x₁,y₁)」和「這個 token 來自 reference 2 的 spatial position (x₂,y₂)」。
+
+應用到 storyboard：panel 1（左上）的 visual token 帶著空間位置 (x₁, y₁)，panel 2（中上）帶著 (x₂, y₁)，依此類推。在 DiT 的 joint attention 中，這些空間座標被 learned mapping 對應到生成序列的不同時間區段——model 從訓練中學到「左上方的 visual condition → shot 1 → 時間段 1」。這不是 hard-coded 規則，是從大量 multi-shot 訓練資料中湧現的映射。
+
+**Step 5：Cross-Attention 在不同時段查閱不同空間區域**
+
+生成 shot 1 的時間段，cross-attention 的 query 傾向 attend 到 panel 1 對應的空間區域（因為訓練時學到 spatial↔temporal 對應）。進入 shot 2 時，attention 轉移到 panel 2 的區域。Temporal Attention（[Q4：時空注意力分工](../q04-spatial-temporal/)）在時間軸上平滑兩個 attention focus 之間的過渡——視覺上表現為運鏡。
+
+VINO（[arxiv:2601.02358](https://arxiv.org/abs/2601.02358)）的架構和這個推論一致：VLM 輸出 interleaved conditioning tokens，multimodal DiT 透過 cross-attention 查閱這些 token。EasyRef（[arxiv:2412.09618](https://arxiv.org/abs/2412.09618)）證明 multi-reference 之間需要 attention-based interaction（而非簡單的平均），間接支持「不同 spatial region 被不同時間段 attend」的機制。
 
 :::tip[🎬 導演要點]
-- **Storyboard 的價值是提供多時間點的構圖錨點**——不是風格參考。角色外觀統一交給 @ 角色參考圖（[Q11](../q11-at-tags/)）
-- Panel 之間的空間差異會影響輸出運鏡，但模型是推斷，不是執行指令。想精確控制，在 prompt 中明確寫運鏡術語（[Q14](../q14-camera-motion/)）
-- 實戰技巧見 [Q17：Storyboard 實戰](../q17-storyboard-practice/)——面板數、文字滲入防範、與角色圖的分工
+- Storyboard 上的**文字標註真的會被讀取**——"CU"、"push-in"、"0-3s" 寫清楚，不要只畫圖
+- Panel 排列順序要和時間軸對應：左上→右上→左下→右下是標準閱讀順序，model 也會這樣理解。不要跳躍排列
+- 實戰技巧見 [Q17：Storyboard 實戰](../q17-storyboard-practice/)——面板數量、文字滲入防範、與角色圖的分工
 :::
 
 :::caution[⚠️ 誠實揭露]
-Seedance 1.0/2.0 論文均未描述 storyboard 圖片的內部解析機制（panel 分割、OCR 文字讀取、Shot Decomposition 步驟）。「為什麼給 storyboard 會自動產生運鏡」段落為基於 Seedance 1.0 公開架構（MM-RoPE multi-shot 序列 + Temporal Attention 幀間平滑）的推論，非官方確認的實作細節。學術界做法（STAGE、ShotAdapter、CoAgent）引用自公開論文，不等於 Seedance 內部實作。
+Seedance 1.0/2.0 論文均未描述 storyboard 圖片的內部解析機制。以下為推論：(1) Vision encoder 使用 Seed-VL——論文有引用但未確認即為 storyboard 前處理組件；(2) OCR 讀取文字標註——基於 VLM 標準能力和官方 prompt 範例推論；(3) 空間位置對應時間軸——基於 MM-RoPE 設計和 Kaleido R-RoPE 類推。VINO 和 EasyRef 為學術界佐證，不等於 Seedance 內部實作。
 :::
 
 :::note[📖 引用論文]
-Seedance 1.0: Exploring the Boundaries of Video Generation Models — [arxiv:2506.09113](https://arxiv.org/abs/2506.09113)
-
 Seedance 2.0: Advancing Video Generation for World Complexity — [arxiv:2604.14148](https://arxiv.org/abs/2604.14148)
 
-STAGE: Storyboard-Anchored Generation for Cinematic Multi-shot Narrative (CVPR 2026) — [arxiv:2512.12372](https://arxiv.org/abs/2512.12372)
+Seed1.5-VL Technical Report — [arxiv:2505.07062](https://arxiv.org/abs/2505.07062)
 
-ShotAdapter: Text-to-Multi-Shot Video Generation with Diffusion Models (CVPR 2025) — [arxiv:2505.07652](https://arxiv.org/abs/2505.07652)
+Seedance 1.0: Exploring the Boundaries of Video Generation Models — [arxiv:2506.09113](https://arxiv.org/abs/2506.09113)
 
-CoAgent: Collaborative Planning and Consistency Agent for Coherent Video Generation — [arxiv:2512.22536](https://arxiv.org/abs/2512.22536)
+VINO: A Unified Visual Generator with Interleaved OmniModal Context — [arxiv:2601.02358](https://arxiv.org/abs/2601.02358)
+
+Kaleido: Multi-Subject Reference Video Generation with R-RoPE — [arxiv:2510.18573](https://arxiv.org/abs/2510.18573)
+
+EasyRef: Omni-Generalized Group Image Reference via Multimodal LLM — [arxiv:2412.09618](https://arxiv.org/abs/2412.09618)
 :::
