@@ -7,41 +7,42 @@ sidebar:
 
 ## 一句話
 
-同一個房間，換個鏡頭後家具位置變了、桌上的杯子不見了、牆上的畫換了——[Q4：注意力機制](../01-basics/q04-attention/) 的 Cross-Attention Identity Locking 只鎖人物臉部，背景物體缺乏專門的 identity embedding。[Q16：Storyboard](../02-seedance/q16-storyboard/) 的 multi-shot 架構中，每個 shot 有自己的 visual condition——人物靠 Identity Embedding 繼承，但場景 spatial layout 沒有對應的跨 shot 記憶機制。
+角色臉一樣，房間全變了——Seedance 2.0 的角色鎖定只認人臉，不認家具。每個 shot 是各自獨立生成的，Shot 2 不知道 Shot 1 的房間長怎樣。
 
-## 為什麼背景不會自動一致？
+## 角色記得，場景不記得
 
-[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 Identity Embedding 機制專門針對**人物臉部**設計——`@image1` 把參考圖的視覺特徵灌進 Cross-Attention，確保角色跨 shot 不變臉。但這個機制有一個盲點：Embedding Slot 在訓練中被優化來捕捉**人物特徵**（面部幾何、膚色、髮型）——背景物體（家具、牆壁、裝飾）不在 Identity Embedding 的訓練目標內。
+[Q11：@ 標籤](../02-seedance/q11-at-tags/) 的 Identity Embedding 專門鎖定**人物臉部**——`@image1` 把參考圖的面部特徵灌進 Cross-Attention，確保角色跨 shot 不變臉。訓練時這個機制只學面部幾何、膚色、髮型——家具、牆壁、裝飾品不在它的學習範圍內。不是「學了但沒學好」，是「根本沒學」。
 
-[Q16：Storyboard](../02-seedance/q16-storyboard/) 說明了 storyboard 各 panel 作為多時間點 visual condition 的機制：每個 panel 錨定對應時間點的構圖，Temporal Attention 補出之間的過渡——但這個機制只保證視覺連續性，不保證場景物體位置跨 shot 一致。Shot 1 的「書桌靠左牆」和 Shot 2 的「書桌靠右牆」對模型來說沒有矛盾——因為模型學的是「如何從構圖 A 過渡到構圖 B」，而不是「書桌的絕對位置應該在哪」。
+所以人物跨 shot 穩定，背景跨 shot 放飛。
 
-## 位置編碼沒有全局場景座標
+## 每個 shot 各自為政
 
-[Q6：時間步調節](../01-basics/q06-timestep/) 的位置編碼標記每個 token 在「這一幀」的空間位置——左上角、右下角、第 N 幀。但位置編碼是 **per-frame local coordinate**，不是全局場景座標。沒有「這個杯子在房間的 (x,y,z) 位置，跨 shot 保持一致」的機制。
+[Q16：Storyboard](../02-seedance/q16-storyboard/) 說明了 multi-shot 的運作方式：每個 shot 有自己的畫面條件，shot 之間的過渡由 Temporal Attention 補出。但 Temporal Attention 補的是**視覺平滑**——讓畫面不跳——不是**場景記憶**。
 
-nemovideo.com 社群提出的解法是 **scene bible**：在 prompt 中手動寫死環境常數——家具位置、時間、指示牌、裝飾物——用文字描述代替模型本該有的 spatial memory。
+Shot 1 書桌靠左牆，Shot 2 書桌靠右牆。對模型來說這不矛盾——它沒有「書桌的絕對位置」這個概念。模型學的是「從構圖 A 過渡到構圖 B 看起來要自然」，不是「書桌應該一直在同一個位置」。
 
-## 解法：ComfyUI 與 Seedance 對照
+更根本的原因是：位置編碼（[Q6：時間步調節](../01-basics/q06-timestep/)）只標記 token 在「這一幀」的空間位置（左上角、右下角），沒有全局座標系。不存在「杯子在房間座標 (x,y,z)，跨 shot 不變」這種機制。每一幀都是從零開始理解空間關係。
 
-### ComfyUI
+## 解法：手動建立場景記憶
 
-- 背景參考圖 + Tile ControlNet 鎖定空間結構（引用 [Q4](../01-basics/q04-attention/) ControlNet 獨立路徑——對 latent 施加 explicit 空間約束）
-- 鎖定寬高比和解析度——避免觸發 [Q6](../01-basics/q06-timestep/) patch 網格重算
+模型沒有場景記憶，就用人來補。社群共識解法是 **scene bible**：在每個 shot 的 prompt 中重複寫入相同的環境描述——用文字當作跨 shot 的場景常數。
 
-### Seedance 2.0
+## 實務做法
 
-- **建立 scene bible**（nemovideo.com 方法）：在每個 shot 的 prompt 中重複寫入相同的環境描述——「書桌靠左牆，上面有咖啡杯和檯燈，牆上掛著一幅藍色抽象畫」
-- 背景參考圖：單獨上傳一張「空場景」照片作為 @image 背景鎖定
-- 鎖定寬高比和解析度
-- 減少跨 shot 的攝影機角度大幅變化——越相似的構圖，模型越容易維持 spatial consistency
+| 工具 | 做法 |
+|---|---|
+| **Seedance 2.0** | 每個 shot prompt 重複寫入相同環境描述（scene bible）。上傳空場景照片作為背景參考圖。鎖定寬高比和解析度。減少跨 shot 的攝影機角度劇烈變化——構圖越相似，場景越容易一致 |
+| **ComfyUI** | 背景參考圖 + Tile ControlNet 鎖定空間結構。鎖定寬高比和解析度防止 patch 網格重算 |
+
+scene bible 範例：每個 shot 的 prompt 都寫「書桌靠左牆，上面有咖啡杯和檯燈，牆上掛著藍色抽象畫」——一字不改，每個 shot 重複。
 
 Tile ControlNet 完整參數見 [Part 4：ComfyUI 節點速查](../04-workflow/comfyui-nodes/)，場景 preset 見 [Part 4：場景組合](../04-workflow/scene-presets/)。
 
 :::tip[🎬 導演要點]
 
-Seedance 2.0 的 Identity Locking 是**人臉專用**——不要期待它自動維持場景一致。
+模型只記人臉，不記房間。場景一致性靠人來維護。
 
-**每個 shot 的 prompt 都寫死環境描述（scene bible）。** 這是手動彌補模型缺乏的場景記憶。寧可重複囉嗦，不要期待模型記得上一 shot 的房間長怎樣。
+**每個 shot 的 prompt 都寫死環境描述。** 寧可重複囉嗦，不要期待模型記得上一 shot 的房間長怎樣。
 
 :::
 
