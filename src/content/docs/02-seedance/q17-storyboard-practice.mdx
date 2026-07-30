@@ -1,44 +1,102 @@
 ---
-title: Storyboard 實戰技巧
-description: 六個關鍵決策——面板數、角色分離、示意圖 vs 渲染、文字滲入防範、用途宣告、前置修復
+title: Storyboard 實戰——從前置到 prompt 的完整流程
+description: 基於 Q16 的做法 B（vision encoder + emergent OCR + prompt 引導），整理社群驗證過的 storyboard 實戰流程：準備、上傳、prompt、迭代
 sidebar:
   order: 9
 ---
 
 ## 一句話
 
-六個關鍵決策——面板數、角色分離、示意圖 vs 渲染、文字滲入防範、用途宣告、前置修復。
+[Q16](../q16-storyboard/) 的結論：storyboard 走 vision encoder 整張編碼、文字可能被讀取也可能滲入、prompt 必須提供敘事邏輯。以下實戰流程就是圍繞這三個事實設計的。
 
-## 放幾格最好？塞 12 格會不會讓注意力分散？
+## 一、Storyboard 本身怎麼準備
 
-**≤4 panel（2×2 網格）是甜蜜點。** ByteDance 官方（morphic.com 引述）明確警告：「With too many references, the model struggles to judge which features take priority, and you get **style conflicts, blurry subject identification**, and output that drifts from what you asked for。」注意力是有限資源——panel 越多，每個 panel 分到的 Cross-Attention 權重越低。12 格的 storyboard 在 oimi.ai 案例中可行，但前提是每個 panel 只有一個主體/一個動作，且 prompt 非常精確。
+### 幾格最好？
 
-## Storyboard 裡也有角色——它會不會跟我的角色參考圖打架？
+**≤4 格（2×2）。** Q16 說明了原因：格數越多，每格在 feature map 中佔的空間越小，cross-attention 越難區分不同 panel。morphic.com 直接警告："With too many references, the model struggles to judge which features take priority, and you get style conflicts, blurry subject identification."
 
-**會。這是 identity drift 的常見來源。** morphic.com 確認：「Seedance 2.0 frequently reads a multi-view sheet as **several different people**。」如果 storyboard 中同一角色在不同 panel 畫得稍有不同，模型可能把它當成多個不同的人。解法：**分離角色參考圖和 storyboard**——@Image1 用純色背景的正面特寫鎖定 Identity，@Image2 用 storyboard 控制構圖和運鏡。prompt 中明確分工。
+12 格可以成功（oimi.ai 案例），但前提是每格只有一個主體、一個動作，且 prompt 非常精確。一般情況不要挑戰極限。
 
-## 該用示意圖（鉛筆草稿）還是完整渲染圖？
+### 每格放什麼？
 
-**兩者都可行，但鐵律是「所有 reference 保持相同視覺 register」**——不要混合照片和插畫（seedance2.so）。Sketch 風格的成功案例：oimi.ai 用 rough graphite storyboard sketch style + 12 panels，Seedance 2.0 一次生成成功。示意圖的優勢：模型理解為 pre-vis，不會污染角色外觀。風險：sketch 風格（鉛筆線條、單色調）可能滲入輸出。
+**一格 = 一個主體 + 一個動作。** Reddit r/generativeAI 建議："Keep each frame simple. One main subject/action per frame beats a giant shot-list prompt." 擁擠的 panel 讓 vision encoder 輸出的特徵混在一起，model 難以區分什麼是重點。
 
-## Storyboard 上面的文字標註會不會跑到輸出影片裡？
+### 示意圖還是渲染圖？
 
-**會。這是已知 bug。** OpenArt 的 Seedance 2.0 Handbook 明確警告：storyboard 上的文字標註（"CU"、"push-in"、"0-3s"）可能 **bleed 進輸出畫面**。解法：在 prompt 中加 `"no text overlay on screen"`。
+**都可以，鐵律是保持統一的視覺 register。** seedance2.so 警告不要混合照片和插畫風格——vision encoder 會把它們當成不同的視覺條件，輸出風格混亂。鉛筆草稿的優勢：model 理解為 pre-vis，不會污染角色外觀。風險：鉛筆線條可能滲入輸出。
 
-## Prompt 裡要怎麼寫，模型才知道哪張是 storyboard、哪張是角色臉？
+### 上傳前修圖
 
-**明確指定每個 reference 的用途。** 模型不會自動判斷哪張圖該做什麼（seedance2.so）。範例 prompt：`"@Image1 as storyboard reference for shot composition and camera movement. @Image2 as character face reference——use only for facial features and expression, not the background or lighting."`
+Reddit 社群共識："Fix frames surgically before sending to video: inpaint faces/hands/background extras, remove weird objects, then upscale only the locked frame." storyboard 上的瑕疵會直接進入 vision encoder 的 visual condition，model 分不出「這是故意的風格」還是「這是手殘畫歪」。
 
-## Storyboard 丟進去之前，有什麼前置作業？
+## 二、角色參考圖和 storyboard 必須分離
 
-Reddit r/generativeAI 社群的最佳實踐：inpaint 多餘物體、修復臉部和手部、移除雜亂背景元素；upscale 到足夠解析度；確認所有 panel 的光線和風格一致。
+**這是最重要的一條規則。** morphic.com 確認了一個關鍵 bug："Seedance 2.0 frequently reads a multi-view sheet as several different people." storyboard 中同一角色在不同 panel 畫得稍有不同，model 可能把它當成多個不同的人。
+
+解法：三張圖分工。
+
+| 圖片 | 用途 | 內容 |
+|------|------|------|
+| @Image1 | 角色鎖定 | 純色背景正面特寫，只鎖臉部 identity |
+| @Image2 | Storyboard | 構圖和運鏡，不要放角色外觀細節 |
+| @Image3（可選） | 場景聖經（scene bible）| 空場景照片或描述，鎖定背景一致性 |
+
+a2set.com 的建議："The character sheet defines who the character is. The storyboard defines what happens. The prompt explains how the AI should connect both references into a video."
+
+## 三、Prompt 怎麼寫
+
+### 明確指定每個 reference 的用途
+
+model 不會自動判斷哪張圖該做什麼。seedance2.so 和 Luma 教學都強調 explicit assignment：
+
+```
+@Image1 as character face reference — use only for facial features, not the background.
+@Image2 as storyboard reference for shot composition and camera movement.
+```
+
+Luma 的寫法更直接：`Use @Image1 through @Image4 as storyboard frames in sequence.`
+
+### 描述 panel 之間的敘事邏輯
+
+Q16 的核心發現之一：model 需要 prompt 來理解 panel 之間的關係。OpenArt Handbook 說："describe the narrative logic between panels in your prompt. The model needs to understand the story progression, not just the visual sequence."
+
+壞 prompt：`"Use reference image to create a 15s cinematic animation."`
+
+好 prompt：`"This storyboard shows: panel 1 — wide establishing shot of tavern exterior; panel 2 — push-in through door to reveal fight inside; panel 3 — close-up of protagonist's hand reaching for weapon. Generate smooth transitions between these shots with matching camera movement."`
+
+### 標記時間點
+
+Reddit r/generativeAI 經驗："Timestamp Strictness: Natural language confuses generation models when it comes to precise pacing. Timestamp everything better in your prompt."
+
+`0-3s: wide shot of tavern, slow push-in. 3-5s: quick cut to close-up of hand on weapon. 5-8s: fast pan following the fight.`
+
+## 四、文字標註寫在哪？
+
+**寫在 prompt 裡，不要寫在 storyboard 上。** Q16 解釋了原因：文字同時被 vision encoder 當成語義資訊和 visual texture——寫在 storyboard 上的 "CU"、"push-in" 可能被讀取為運鏡指令，也可能直接出現在輸出畫面中。
+
+如果你必須在 storyboard 上寫文字（例如交給客戶的 pre-vis 文件本身就帶標註），OpenArt Handbook 的解法：在 prompt 最後加 `"no text overlay on screen"`。
+
+## 五、迭代流程
+
+morphic.com 的實用模式：**先用 Fast 版試 prompt 和 reference 的組合，確認 behavior 正確後，再用完整版出最終成品。** Fast 版速度快、成本低，適合實驗 panel 數量和 prompt 寫法。
+
+nemovideo.com 的框架總結了整個流程：Shot list → Scene bible → Anchored prompts → Systematic generation → Disciplined assembly。
+
+:::tip[🎬 導演要點]
+- **角色和 storyboard 分開上傳**——這是避免 identity drift 的最高 ROI 動作
+- **一格 = 一個 shot = 一個主體**——不要在一格裡塞 complex scene
+- **Prompt 寫明 panel 順序和過渡方式**——model 看到的是 grid，需要靠 prompt 理解時序
+- **文字寫在 prompt 裡**——storyboard 上的標註是雙面刃
+:::
 
 :::note[📖]
-morphic.com Seedance 2.0 指南 — reference 數量警告。
+morphic.com Seedance 2.0 指南 — reference 優先級、Fast/Full 迭代模式。
 
-seedance2.so reference 指南 — 視覺 register 一致性。
+oimi.ai GPT Image 2 + Seedance 2.0 案例 — 12 格 storyboard 實戰。
 
-oimi.ai GPT Image 2 + Seedance 2.0 案例 — sketch storyboard 成功實例。
+OpenArt Seedance 2.0 Handbook — 文字滲入 bug、敘事邏輯 prompt。
 
-OpenArt Seedance 2.0 Handbook — 文字滲入 bug。
+nemovideo.com — scene bible、anchored prompts 方法論。
+
+a2set.com — 角色圖/storyboard/prompt 三層分工。
 :::
