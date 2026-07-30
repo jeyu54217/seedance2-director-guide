@@ -11,7 +11,9 @@ sidebar:
 
 ## 唇形同步延遲
 
-### Prompt 文字才是唇形 ground truth，不是上傳音訊：Visual Branch 和 Audio Branch 共用同一個去噪排程，每一步透過 **Cross-Modal Joint Module** 交換狀態。Audio Branch 把 **phoneme timing**（哪個音素在什麼時間點發出）傳給 Visual Branch——/p/ 音（雙唇爆破）→ 對應幀的嘴唇區域 latent 調整：雙唇閉合、爆破張開。
+### Prompt 文字才是唇形 ground truth，不是上傳音訊
+
+[Q10：雙分支架構](../02-seedance/q10-dual-branch/) 的雙向 cross-attention 機制：Visual Branch 和 Audio Branch 共用同一個去噪排程，每一步透過雙向 cross-attention 交換狀態。Audio Branch 把 **phoneme timing**（哪個音素在什麼時間點發出）傳給 Visual Branch——/p/ 音（雙唇爆破）→ 對應幀的嘴唇區域 latent 調整：雙唇閉合、爆破張開。
 
 關鍵在於：這個 phoneme timing 是從 **Prompt 中的雙引號對白文字** 經 TTS 層生成的——**不是從上傳的音訊檔案提取的**。上傳的 @Audio1 是節奏和語調的參考（[Q10](../02-seedance/q10-dual-branch/) 明確指出：上傳音訊是 voice style reference，不是 voice cloning source）。
 
@@ -21,7 +23,7 @@ sidebar:
 
 - 對白 ≤12 詞 / 10 秒，≤20 詞 / 15 秒（ugccopilot.ai 最佳實踐）
 - 精確時間標籤 `[00:01-00:03]` 提供 explicit timing anchor
-- 句子間加微停頓標記作重同步錨點：每個新句子讓 Cross-Modal Joint Module 重新對齊 phoneme timing
+- 句子間加微停頓標記作重同步錨點：每個新句子讓雙向 cross-attention 重新對齊 phoneme timing
 - 減少頭部運動 Prompt——大幅度的頭部轉動使嘴唇區域 latent 追蹤難度倍增
 - **ComfyUI 無法修復原生雙分支去噪**——這是訓練階段嵌入的機制，推理端只能走級聯（[Q10](../02-seedance/q10-dual-branch/) 導演要點）
 

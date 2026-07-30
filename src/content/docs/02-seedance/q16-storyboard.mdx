@@ -1,21 +1,17 @@
 ---
 title: 丟九宮格 storyboard 給 Seedance——它真的看得懂嗎？
-description: 從社群行為反推 storyboard 的內部機制：vision encoder 整張編碼 + emergent OCR + prompt 敘事引導
+description: 從社群行為反推 storyboard 內部機制：vision encoder 整張編碼 + 文字被讀取（機制未知）+ prompt 敘事引導
 sidebar:
   order: 8
 ---
 
 ## 一句話
 
-Storyboard 走的是標準 vision encoder，整張圖編碼，沒有 panel 分割、沒有獨立 OCR。grid 結構靠 vision encoder 的空間理解能力隱式處理，文字標註靠 emergent OCR 部分讀取——但文字同時被當成 visual texture，所以可能滲入輸出。model 需要 prompt 提供 panel 之間的敘事邏輯，因為 vision encoder 不負責理解「panel 1 和 panel 2 是什麼關係」。
+Storyboard 走 vision encoder 整張圖編碼，沒有 panel 分割。grid 結構靠 encoder 的空間理解隱式處理。**文字標註會被讀取**（oimi.ai 案例中 storyboard 上的運鏡註釋確實影響了輸出），但文字同時留在 visual feature 中沒有被移除——所以可能滲入畫面。讀取文字的機制未知：可能是 vision encoder 內建的 OCR 能力，也可能是 ByteDance 的 Seed-VL 家族做前處理——兩種都無法被現有證據排除。model 需要 prompt 提供 panel 之間的敘事邏輯：vision encoder 告訴 model「這張圖長怎樣」，prompt 告訴 model「這些 panel 之間的關係是什麼」。
 
-## 為什麼不是更複雜的做法
+## 為什麼不是前處理切片
 
-兩個關鍵現象排除了其他可能：
-
-**文字滲入 bug**（OpenArt Handbook：storyboard 上的 "CU"、"push-in" 可能 bleed 進影片畫面）。這表示文字沒有被提取成獨立的 text token——如果內部有 OCR pipeline 把文字分離出來，文字就不會留在畫面中。同一段文字同時被當成語義指引和 visual texture，這是 emergent OCR（vision encoder 在訓練中獲得的識字能力，不是獨立模組）的特徵。
-
-**ComfyUI 直接餵整張 contact sheet 就能 work**。如果內部需要切片，這不可能。
+ComfyUI 的 `ByteDance2ReferenceNode` 直接餵整張 contact sheet，沒有切片步驟。如果內部需要先把 storyboard 切成獨立 panel，這個 workflow 不應該 work。切片可能是可行的替代方案（使用者自己切好九張圖上傳），但不是內部預設行為。
 
 ## 機制：三步
 
@@ -33,7 +29,7 @@ Storyboard 走的是標準 vision encoder，整張圖編碼，沒有 panel 分�
 :::
 
 :::caution[⚠️ 誠實揭露]
-Seedance 論文未描述 storyboard 內部機制。以上機制為從社群使用行為（文字滲入 bug、prompt 依賴性、ComfyUI workflow）反推的推論，非官方確認。
+Seedance 論文未描述 storyboard 內部機制。以上為從社群行為反推的推論。文字讀取的具體機制（vision encoder 內建 OCR vs 專用 VLM/OCR 前處理）無法從現有證據判斷；文字滲入 bug 只證明文字未被從視覺特徵中移除，不構成對 OCR 存在的否定。
 :::
 
 :::note[📖 引用論文]
